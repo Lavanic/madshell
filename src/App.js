@@ -135,7 +135,23 @@ const TerminalComponent = () => {
 
   return (
     <div className="terminal-container">
-      {/* ... your header and controls ... */}
+      <div className="terminal-header">
+        <div className="window-controls">
+          <span
+            className="control close"
+            onClick={() => handleWindowControls("close")}
+          />
+          <span
+            className="control minimize"
+            onClick={() => handleWindowControls("minimize")}
+          />
+          <span
+            className="control maximize"
+            onClick={() => handleWindowControls("maximize")}
+          />
+        </div>
+        <div className="terminal-title">goodshell</div>
+      </div>
       <div ref={xtermRef} className="terminal-content" />
     </div>
   );
