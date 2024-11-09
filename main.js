@@ -17,7 +17,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    backgroundColor: "#00000000",
+    backgroundColor: "#1E1E2E",
     vibrancy: "dark",
     visualEffectState: "active",
     roundedCorners: true,
@@ -49,7 +49,7 @@ function createWindow() {
       // Function to send output without extra spacing
       const sendOutput = (text) => {
         // Remove any existing trailing newlines and add just one
-        const cleanOutput = text.replace(/\r?\n$/, '') + '\n';
+        const cleanOutput = text.replace(/\r?\n$/, "") + "\n";
         event.sender.send("command-output", cleanOutput);
       };
 
@@ -64,14 +64,18 @@ function createWindow() {
         case "ls":
           try {
             const files = fs.readdirSync(currentWorkingDirectory);
-            const output = files.map(file => {
-              const stats = fs.statSync(path.join(currentWorkingDirectory, file));
-              const isDir = stats.isDirectory();
-              const colorCode = isDir ? "\x1b[36m" : "\x1b[0m";
-              const suffix = isDir ? "/" : "";
-              return `${colorCode}${file}${suffix}\x1b[0m`;
-            }).join(" ");
-            
+            const output = files
+              .map((file) => {
+                const stats = fs.statSync(
+                  path.join(currentWorkingDirectory, file)
+                );
+                const isDir = stats.isDirectory();
+                const colorCode = isDir ? "\x1b[36m" : "\x1b[0m";
+                const suffix = isDir ? "/" : "";
+                return `${colorCode}${file}${suffix}\x1b[0m`;
+              })
+              .join(" ");
+
             sendOutput(output);
             resolve({ output, errorOutput: "", code: 0 });
             return;
@@ -97,7 +101,11 @@ function createWindow() {
         case "pwd":
           try {
             sendOutput(currentWorkingDirectory);
-            resolve({ output: currentWorkingDirectory, errorOutput: "", code: 0 });
+            resolve({
+              output: currentWorkingDirectory,
+              errorOutput: "",
+              code: 0,
+            });
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
@@ -125,7 +133,7 @@ function createWindow() {
                   }
                 }
               };
-              
+
               deleteRecursive(targetPath);
               sendOutput(`Removed: ${target}`);
               resolve({ output: "", errorOutput: "", code: 0 });

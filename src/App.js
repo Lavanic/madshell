@@ -25,11 +25,11 @@ const TerminalComponent = () => {
   };
 
   const formatTimestamp = (date) => {
-    return date.toLocaleTimeString('en-US', { 
+    return date.toLocaleTimeString("en-US", {
       hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
   };
 
@@ -38,31 +38,31 @@ const TerminalComponent = () => {
       fontSize: 14,
       fontFamily: '"SF Mono", Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: '#1E1E2E',
-        foreground: '#CDD6F4',
-        cursor: '#F5E0DC',
-        cursorAccent: '#1E1E2E',
-        selection: 'rgba(245, 224, 220, 0.3)',
-        black: '#45475A',
-        brightBlack: '#585B70',
-        red: '#F38BA8',
-        brightRed: '#F38BA8',
-        green: '#A6E3A1',
-        brightGreen: '#A6E3A1',
-        yellow: '#F9E2AF',
-        brightYellow: '#F9E2AF',
-        blue: '#89B4FA',
-        brightBlue: '#89B4FA',
-        magenta: '#F5C2E7',
-        brightMagenta: '#F5C2E7',
-        cyan: '#94E2D5',
-        brightCyan: '#94E2D5',
-        white: '#BAC2DE',
-        brightWhite: '#A6ADC8'
+        background: "rgba(24, 24, 27, 0.95)",
+        foreground: "#ffffff",
+        cursor: "#ffffff",
+        cursorAccent: "#000000",
+        selection: "rgba(255, 255, 255, 0.3)",
+        black: "#000000",
+        brightBlack: "#666666",
+        red: "#ff5555",
+        brightRed: "#ff6e67",
+        green: "#50fa7b",
+        brightGreen: "#5af78e",
+        yellow: "#f1fa8c",
+        brightYellow: "#f4f99d",
+        blue: "#6272a4",
+        brightBlue: "#6272a4",
+        magenta: "#ff79c6",
+        brightMagenta: "#ff92d0",
+        cyan: "#8be9fd",
+        brightCyan: "#9aedfe",
+        white: "#bfbfbf",
+        brightWhite: "#ffffff",
       },
       cursorBlink: true,
       cursorStyle: "bar",
-      allowTransparency: false,
+      allowTransparency: true,
       rendererType: "canvas",
       lineHeight: 1.2,
       letterSpacing: 0.5,
@@ -83,8 +83,13 @@ const TerminalComponent = () => {
     fitAddon.fit();
     setTerminal(term);
 
+    const asciiArt = `                          .___     .__           .__  .__   \r\n   ____   ____   ____   __| _/_____|  |__   ____ |  | |  |  \r\n  / ___\\ /  _ \\ /  _ \\ / __ |/  ___/  |  \\_/ __ \\|  | |  |  \r\n / /_/  >  <_> |  <_> ) /_/ |\\___ \\|   Y  \\  ___/|  |_|  |__ \r\n \\___  / \\____/ \\____/\\____ /____  >___|  /\\___  >____/____/ \r\n/_____/                    \\/    \\/     \\/     \\/            `;
+    term.writeln("\x1b[36m" + asciiArt + "\x1b[0m");
+
+    setTerminal(term);
+
     // Initial CWD fetch
-    window.electronAPI.getCwd().then(cwd => {
+    window.electronAPI.getCwd().then((cwd) => {
       setCurrentCwd(cwd);
     });
 
@@ -148,7 +153,7 @@ const TerminalComponent = () => {
   const prompt = async (term) => {
     const cwd = await window.electronAPI.getCwd();
     setCurrentCwd(cwd);
-    const dir = cwd.split('/').pop();
+    const dir = cwd.split("/").pop();
     term.write(`\x1b[38;2;137;180;250m${dir} ❯\x1b[0m `);
   };
 
@@ -159,11 +164,14 @@ const TerminalComponent = () => {
     }
 
     // Update command history
-    setCommandHistory(prev => [...prev, {
-      command,
-      timestamp: new Date(),
-      cwd: currentCwd
-    }]);
+    setCommandHistory((prev) => [
+      ...prev,
+      {
+        command,
+        timestamp: new Date(),
+        cwd: currentCwd,
+      },
+    ]);
 
     if (command === "clear") {
       term.clear();
@@ -199,9 +207,9 @@ const TerminalComponent = () => {
   useEffect(() => {
     if (terminal) {
       const handleOutput = async (data) => {
-        if (typeof data === 'string') {
+        if (typeof data === "string") {
           const duration = Date.now() - commandStartTimeRef.current;
-          const cleanOutput = data.replace(/\r\n/g, '\n').replace(/\n+$/, '');
+          const cleanOutput = data.replace(/\r\n/g, "\n").replace(/\n+$/, "");
           if (cleanOutput.length > 0) {
             writeCommandResult(terminal, cleanOutput, duration);
           }
@@ -218,52 +226,27 @@ const TerminalComponent = () => {
   }, [terminal]);
 
   return (
-    <div className="h-screen bg-[#1E1E2E] flex flex-col overflow-hidden">
-      <div className="terminal-header bg-[#181825] px-4 py-2 flex items-center justify-between border-b border-[#313244]">
-        <div className="flex items-center space-x-4">
-          <div className="window-controls flex space-x-2">
-            <span
-              className="control close h-3 w-3 rounded-full bg-[#F38BA8] hover:opacity-80"
-              onClick={() => handleWindowControls("close")}
-            />
-            <span
-              className="control minimize h-3 w-3 rounded-full bg-[#F9E2AF] hover:opacity-80"
-              onClick={() => handleWindowControls("minimize")}
-            />
-            <span
-              className="control maximize h-3 w-3 rounded-full bg-[#A6E3A1] hover:opacity-80"
-              onClick={() => handleWindowControls("maximize")}
-            />
-          </div>
-          <div className="text-[#CDD6F4] text-sm font-medium">goodshell</div>
+    <div className="terminal-container">
+      <div className="terminal-header">
+        <div className="window-controls">
+          <span
+            className="control close"
+            onClick={() => handleWindowControls("close")}
+          />
+          <span
+            className="control minimize"
+            onClick={() => handleWindowControls("minimize")}
+          />
+          <span
+            className="control maximize"
+            onClick={() => handleWindowControls("maximize")}
+          />
         </div>
+        <div className="terminal-title">goodshell</div>
       </div>
-
-      <div className="flex-1 overflow-hidden relative bg-[#1E1E2E]">
-        <div ref={xtermRef} className="h-full" />
+      <div className="terminal-content">
+        <div ref={xtermRef} className="terminal-wrapper" />
       </div>
-
-      <style jsx global>{`
-        .xterm {
-          padding: 1rem;
-        }
-        .xterm-viewport {
-          overflow-y: auto !important;
-        }
-        .xterm-viewport::-webkit-scrollbar {
-          width: 8px;
-        }
-        .xterm-viewport::-webkit-scrollbar-track {
-          background: #181825;
-        }
-        .xterm-viewport::-webkit-scrollbar-thumb {
-          background: #45475A;
-          border-radius: 4px;
-        }
-        .xterm-viewport::-webkit-scrollbar-thumb:hover {
-          background: #585B70;
-        }
-      `}</style>
     </div>
   );
 };
