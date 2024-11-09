@@ -4,7 +4,6 @@ import { FitAddon } from "xterm-addon-fit";
 import { WebLinksAddon } from "xterm-addon-web-links";
 import { SearchAddon } from "xterm-addon-search";
 import "xterm/css/xterm.css";
-const { remote } = require("electron");
 
 const TerminalComponent = () => {
   const xtermRef = useRef(null);
@@ -13,29 +12,19 @@ const TerminalComponent = () => {
   const [currentCommand, setCurrentCommand] = useState("");
 
   const handleWindowControls = (action) => {
-    const window = remote.getCurrentWindow();
-    switch (action) {
-      case "close":
-        window.close();
-        break;
-      case "minimize":
-        window.minimize();
-        break;
-      case "maximize":
-        window.isMaximized() ? window.unmaximize() : window.maximize();
-        break;
-    }
+    window.electronAPI.windowControl(action);
   };
 
   useEffect(() => {
     /* Update terminal configuration in App.js */
     const terminal = new Terminal({
-      fontSize: 11,
+      fontSize: 13,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: "rgba(24, 24, 27, 0.95)", // Match container background
+        background: "rgba(24, 24, 27, 0.95)",
         foreground: "#ffffff",
         cursor: "#ffffff",
+        cursorAccent: "#000000",
         selection: "rgba(255, 255, 255, 0.3)",
         black: "#000000",
         brightBlack: "#666666",
@@ -55,14 +44,18 @@ const TerminalComponent = () => {
         brightWhite: "#ffffff",
       },
       cursorBlink: true,
-      cursorStyle: "bar",
+      cursorStyle: "block",
       allowTransparency: true,
       rendererType: "canvas",
+      fontSize: 12,
+      lineHeight: 0.1,
+      letterSpacing: 0,
       rows: 24,
       cols: 80,
+      scrollback: 1000,
+      minimumContrastRatio: 1,
     });
 
-    // Add terminal addons
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
     const searchAddon = new SearchAddon();
@@ -143,14 +136,17 @@ const TerminalComponent = () => {
           <span
             className="control close"
             onClick={() => handleWindowControls("close")}
+            style={{ pointerEvents: "auto" }}
           />
           <span
             className="control minimize"
             onClick={() => handleWindowControls("minimize")}
+            style={{ pointerEvents: "auto" }}
           />
           <span
             className="control maximize"
             onClick={() => handleWindowControls("maximize")}
+            style={{ pointerEvents: "auto" }}
           />
         </div>
         <div className="terminal-title">goodshell</div>

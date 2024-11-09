@@ -3,33 +3,35 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 module.exports = {
   entry: "./src/index.js",
-  target: "electron-renderer",
+  output: {
+    path: path.resolve(__dirname, "build"),
+    filename: "bundle.js",
+  },
   module: {
     rules: [
       {
-        test: /\.js$/,
+        test: /\.(js|jsx)$/,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
         },
       },
       {
-        test: /\.css$/i,
+        test: /\.css$/,
         use: ["style-loader", "css-loader"],
       },
-      // Add loaders for other file types if needed
     ],
-  },
-  resolve: {
-    extensions: [".js"],
-  },
-  output: {
-    path: path.resolve(__dirname, "build"),
-    filename: "bundle.js",
   },
   plugins: [
     new HtmlWebpackPlugin({
       template: "./src/index.html",
     }),
   ],
+  resolve: {
+    extensions: [".js", ".jsx"],
+  },
+  externals: {
+    electron: "commonjs electron",
+  },
+  target: "electron-renderer",
 };

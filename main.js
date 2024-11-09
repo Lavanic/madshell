@@ -1,30 +1,51 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
-require("@electron/remote/main").initialize();
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 800, // Made it slightly smaller
+    width: 800,
     height: 600,
     frame: false,
     transparent: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true,
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true, // Enable context isolation
+      nodeIntegration: false, // Disable node integration
     },
-    backgroundColor: "#00000000", // Transparent background
+    backgroundColor: "#00000000",
+    vibrancy: "dark",
+    visualEffectState: "active",
+    roundedCorners: true,
   });
 
   win.loadFile(path.join(__dirname, "build", "index.html"));
+
+  // Handle window control actions
+  ipcMain.on("window-control", (event, action) => {
+    switch (action) {
+      case "close":
+        win.close();
+        break;
+      case "minimize":
+        win.minimize();
+        break;
+      case "maximize":
+        win.isMaximized() ? win.unmaximize() : win.maximize();
+        break;
+    }
+  });
 }
 
 app.whenReady().then(createWindow);
 
-app.on("window-all-closed", function () {
-  if (process.platform !== "darwin") app.quit();
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
 
-app.on("activate", function () {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });

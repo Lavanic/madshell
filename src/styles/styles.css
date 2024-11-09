@@ -7,9 +7,11 @@ body {
 .terminal-container {
   width: 100%;
   height: 100vh;
-  background: rgba(24, 24, 27, 0.95); /* Slightly lighter main background */
+  background: rgba(24, 24, 27, 0.95);
   display: flex;
   flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .terminal-header {
@@ -18,7 +20,7 @@ body {
   padding: 8px 12px;
   background: rgba(9, 9, 11, 0.95); /* Darker header */
   -webkit-app-region: drag;
-  height: 28px;
+  height: 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Subtle separator */
 }
 
@@ -34,7 +36,8 @@ body {
   height: 12px;
   border-radius: 50%;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  position: relative;
 }
 
 .control:hover {
@@ -49,6 +52,19 @@ body {
 }
 .maximize {
   background: #27c93f;
+}
+
+/* Improved button hover states */
+.close:hover {
+  background: #ff4444;
+}
+
+.minimize:hover {
+  background: #ffaa00;
+}
+
+.maximize:hover {
+  background: #00cc44;
 }
 
 .terminal-title {
@@ -71,9 +87,17 @@ body {
 }
 
 .xterm-screen {
-  padding: 12px 16px;
+  padding: 8px 5px; /* Reduced padding */
 }
 
+/* Override xterm.js specific styles */
+.xterm .xterm-screen {
+  padding: 4px;
+}
+
+.xterm .xterm-rows {
+  line-height: 0.2 !important;
+}
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -89,4 +113,11 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Make sure clicks work on window controls */
+.window-controls span {
+  pointer-events: auto;
+  position: relative;
+  z-index: 1000;
 }
