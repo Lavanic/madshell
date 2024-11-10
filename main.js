@@ -6,6 +6,10 @@ const fs = require("fs");
 // Store the current working directory
 let currentWorkingDirectory = process.cwd();
 
+function getGitExecutable() {
+  return process.platform === 'win32' ? 'git' : '/usr/bin/git';
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 800,
@@ -290,44 +294,71 @@ function createWindow() {
             return;
           }
 
-        default:
-          // For other commands, use the shell
-          let shell;
-          let shellArgs;
-
-          if (process.platform === "win32") {
-            shell = "cmd.exe";
-            shellArgs = ["/c", command];
-          } else {
-            shell = "/bin/bash";
-            shellArgs = ["-c", command];
-          }
-
-          // For multiple commands, join them with &&
-          if (command.includes("\n")) {
-            const commands = command.split("\n").filter((cmd) => cmd.trim());
-            const joinedCommand = commands.join(" && ");
-            shellArgs[1] = joinedCommand;
-          }
-
-          const cmdProcess = spawn(shell, shellArgs, {
-            cwd: currentWorkingDirectory,
-            shell: true,
-          });
-
-          cmdProcess.stdout.on("data", (data) => {
-            event.sender.send("command-output", data.toString());
-          });
-
-          cmdProcess.stderr.on("data", (data) => {
-            event.sender.send("command-output", data.toString());
-          });
-
-          cmdProcess.on("close", (code) => {
-            event.sender.send("command-complete", { code });
-            resolve({ code });
-          });
-          break;
+          default:
+            // Special handling for git commands
+            if (command.startsWith('git ')) {
+              const gitPath = getGitExecutable();
+              const gitArgs = args.slice(1);  // Remove 'git' from args
+              
+              const cmdProcess = spawn(gitPath, gitArgs, {
+                cwd: currentWorkingDirectory,
+                env: { ...process.env, PATH: process.env.PATH },
+                shell: false
+              });
+          
+              cmdProcess.stdout.on('data', (data) => {
+                event.sender.send('command-output', data.toString());
+              });
+          
+              cmdProcess.stderr.on('data', (data) => {
+                event.sender.send('command-output', data.toString());
+              });
+          
+              cmdProcess.on('close', (code) => {
+                event.sender.send('command-complete', { code });
+                resolve({ code });
+              });
+              
+              return;
+            }
+          
+            // For other commands, use the shell
+            let shell;
+            let shellArgs;
+          
+            if (process.platform === "win32") {
+              shell = "cmd.exe";
+              shellArgs = ["/c", command];
+            } else {
+              shell = "/bin/bash";
+              shellArgs = ["-c", command];
+            }
+          
+            // For multiple commands, join them with &&
+            if (command.includes('\n')) {
+              const commands = command.split('\n').filter(cmd => cmd.trim());
+              const joinedCommand = commands.join(' && ');
+              shellArgs[1] = joinedCommand;
+            }
+          
+            const cmdProcess = spawn(shell, shellArgs, {
+              cwd: currentWorkingDirectory,
+              shell: true,
+            });
+          
+            cmdProcess.stdout.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
+            });
+          
+            cmdProcess.stderr.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
+            });
+          
+            cmdProcess.on("close", (code) => {
+              event.sender.send("command-complete", { code });
+              resolve({ code });
+            });
+            break;
       }
     });
   });
