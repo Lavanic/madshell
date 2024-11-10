@@ -59,7 +59,7 @@ const TerminalComponent = () => {
   const convertNLQToCommand = async (query) => {
     try {
       const response = await fetch(
-        "https://adb-2339467812627777.17.azuredatabricks.net/serving-endpoints/databricks-meta-llama-3-1-70b-instruct/invocations",
+        "https://adb-2339467812627777.17.azuredatabricks.net/serving-endpoints/mini/invocations",
         {
           method: "POST",
           headers: {
