@@ -38,74 +38,6 @@ const TerminalComponent = () => {
   };
 
   const convertNLQToCommand = async (query) => {
-    const platform = window.platformAPI.platform;
-    let systemPrompt = "";
-
-    if (platform === "win32") {
-      systemPrompt = `You are a Windows command line interface expert. Convert natural language queries into Windows Command Prompt commands.
-  For file creation with content, use a series of echo commands with >> or >.
-  
-  Examples:
-  
-  "create a java program that prints numbers and then run it":
-  echo public class PrintNumbers { > PrintNumbers.java
-  echo "    public static void main(String[] args) {" >> PrintNumbers.java
-  echo "        for (int i = 1; i <= 10; i++) {" >> PrintNumbers.java
-  echo "            System.out.println(i);" >> PrintNumbers.java
-  echo "        }" >> PrintNumbers.java
-  echo "    }" >> PrintNumbers.java
-  echo } >> PrintNumbers.java
-  javac PrintNumbers.java
-  java PrintNumbers
-  
-  "create a text file with hello world":
-  echo Hello, World! > hello.txt
-  
-  Current directory: ${currentCwd}
-  
-  IMPORTANT:
-  1. Use echo commands with > for the first line and >> for subsequent lines.
-  2. Enclose lines that start with spaces (indentation) in double quotes.
-  3. Do not include unnecessary quotes around the code unless required.
-  4. Preserve proper indentation in the code.
-  5. Return only the commands, no explanations or formatting.
-  6. Each command on its own line.
-  `;
-    } else {
-      systemPrompt = `You are a Unix/Linux command line interface expert. Convert natural language queries into shell commands.
-  For file creation with content, use heredoc syntax with 'cat << EOF > filename' and include the content between 'EOF' markers.
-  
-  Examples:
-  
-  "create a python file with two sum solution":
-  cat << EOF > twosum.py
-  def twoSum(nums, target):
-      if len(nums) <= 1:
-          return False
-      buff_dict = {}
-      for i, num in enumerate(nums):
-          if num in buff_dict:
-              return [buff_dict[num], i]
-          buff_dict[target - num] = i
-      return []
-  EOF
-  
-  "create a text file with hello world":
-  cat << EOF > hello.txt
-  Hello, World!
-  EOF
-  
-  Current directory: ${currentCwd}
-  
-  IMPORTANT:
-  1. Use 'cat << EOF > filename' to write multiple lines to a file.
-  2. Do not include unnecessary quotes around the code unless required.
-  3. Preserve proper indentation in the code.
-  4. Return only the commands, no explanations or formatting.
-  5. Each command on its own line.
-  `;
-    }
-
     try {
       const response = await fetch(
         "https://adb-2339467812627777.17.azuredatabricks.net/serving-endpoints/databricks-meta-llama-3-1-70b-instruct/invocations",
@@ -119,7 +51,32 @@ const TerminalComponent = () => {
             messages: [
               {
                 role: "system",
-                content: systemPrompt,
+                content: `You are a command line interface expert. Convert natural language queries into shell commands.
+For file creation with content, use a series of echo commands with >>
+
+Examples:
+
+"create a python file with two sum solution":
+echo "def twoSum(nums, target):" > twosum.py
+echo "    if len(nums) <= 1:" >> twosum.py
+echo "        return False" >> twosum.py
+echo "    buff_dict = {}" >> twosum.py
+echo "    for i, num in enumerate(nums):" >> twosum.py
+echo "        if num in buff_dict:" >> twosum.py
+echo "            return [buff_dict[num], i]" >> twosum.py
+echo "        buff_dict[target - num] = i" >> twosum.py
+echo "    return []" >> twosum.py
+
+"create a text file with hello world":
+echo "Hello, World!" > hello.txt
+
+Current directory: ${currentCwd}
+
+IMPORTANT:
+1. Use echo commands with > for first line and >> for subsequent lines
+2. Preserve proper indentation in the echo strings
+3. Return only the commands, no explanations or formatting
+4. Each echo on its own line`,
               },
               {
                 role: "user",
@@ -226,6 +183,7 @@ const TerminalComponent = () => {
 
     let baseDir = currentCwd;
     let partial = lastToken;
+    const path = window.pathAPI;
 
     // Determine if the last token includes a path
     const lastSeparatorIndex = Math.max(
@@ -235,10 +193,8 @@ const TerminalComponent = () => {
 
     if (lastSeparatorIndex >= 0) {
       const dirPart = lastToken.slice(0, lastSeparatorIndex + 1);
+      baseDir = path.resolve(currentCwd, dirPart);
       partial = lastToken.slice(lastSeparatorIndex + 1);
-
-      // Resolve baseDir using the main process
-      baseDir = await window.electronAPI.resolvePath(currentCwd, dirPart);
     } else {
       baseDir = currentCwd;
       partial = lastToken;
@@ -262,6 +218,7 @@ const TerminalComponent = () => {
       renderInputLine(term, "");
     }
   };
+
   const navigateHistory = async (term, direction) => {
     if (commandHistory.length === 0) return;
 
