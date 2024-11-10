@@ -1,5 +1,7 @@
+// preload.js
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Expose APIs to the renderer process
 contextBridge.exposeInMainWorld("electronAPI", {
   windowControl: (action) => ipcRenderer.send("window-control", action),
   executeCommand: (command) => ipcRenderer.invoke("execute-command", command),
@@ -20,11 +22,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("change-directory", directory),
   getDirectoryContents: (dirPath) =>
     ipcRenderer.invoke("get-directory-contents", dirPath),
+  resolvePath: (...paths) => ipcRenderer.invoke("resolve-path", ...paths),
 });
 
-contextBridge.exposeInMainWorld("pathAPI", {
-  resolve: (...args) => path.resolve(...args),
-  dirname: (p) => path.dirname(p),
-  basename: (p) => path.basename(p),
-  sep: path.sep,
+contextBridge.exposeInMainWorld("platformAPI", {
+  platform: process.platform,
 });

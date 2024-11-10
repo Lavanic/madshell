@@ -50,6 +50,10 @@ function createWindow() {
     }
   });
 
+  ipcMain.handle("resolve-path", (event, ...paths) => {
+    return path.resolve(...paths);
+  });
+
   // Handle command execution
   ipcMain.handle("execute-command", async (event, command) => {
     return new Promise((resolve) => {
@@ -420,7 +424,9 @@ function createWindow() {
 
           if (process.platform === "win32") {
             shell = "cmd.exe";
-            shellArgs = ["/c", command];
+            // Replace newlines with ' & ' to chain commands
+            const formattedCommand = command.replace(/\r?\n/g, " & ");
+            shellArgs = ["/c", formattedCommand];
           } else {
             shell = "/bin/bash";
             shellArgs = ["-c", command];
