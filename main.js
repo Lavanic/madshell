@@ -57,7 +57,7 @@ function createWindow() {
         case "clear":
           // Send special clear command to terminal
           event.sender.send("clear-terminal");
-          event.sender.send("command-complete", { code: 0 }); // Added
+          event.sender.send("command-complete", { code: 0 });
           resolve({ output: "", errorOutput: "", code: 0 });
           return;
 
@@ -77,12 +77,12 @@ function createWindow() {
               .join("\n");
 
             sendOutput(output);
-            event.sender.send("command-complete", { code: 0 }); // Added
+            event.sender.send("command-complete", { code: 0 });
             resolve({ output, errorOutput: "", code: 0 });
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 }); // Added
+            event.sender.send("command-complete", { code: 1 });
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
@@ -95,12 +95,12 @@ function createWindow() {
             const dirPath = path.join(currentWorkingDirectory, args[1]);
             fs.mkdirSync(dirPath);
             sendOutput(`Directory created: ${args[1]}`);
-            event.sender.send("command-complete", { code: 0 }); // Added
+            event.sender.send("command-complete", { code: 0 });
             resolve({ output: "", errorOutput: "", code: 0 });
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 }); // Added
+            event.sender.send("command-complete", { code: 1 });
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
@@ -108,7 +108,7 @@ function createWindow() {
         case "pwd":
           try {
             sendOutput(currentWorkingDirectory);
-            event.sender.send("command-complete", { code: 0 }); // Added
+            event.sender.send("command-complete", { code: 0 });
             resolve({
               output: currentWorkingDirectory,
               errorOutput: "",
@@ -117,7 +117,116 @@ function createWindow() {
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 }); // Added
+            event.sender.send("command-complete", { code: 1 });
+            resolve({ output: "", errorOutput: err.message, code: 1 });
+            return;
+          }
+
+        case "write":
+        case "create":
+          try {
+            if (!args[1]) {
+              throw new Error("write: missing filename");
+            }
+            
+            const filename = args[1];
+            let content = '';
+            
+            // Check if we have heredoc content
+            if (command.includes('<<EOL')) {
+              const parts = command.split('<<EOL\n');
+              if (parts.length >= 2) {
+                content = parts[1].split('\nEOL')[0];
+              }
+            } else {
+              content = args.slice(2).join(' ');
+            }
+            
+            const filePath = path.join(currentWorkingDirectory, filename);
+            fs.writeFileSync(filePath, content + '\n', { flag: 'w' });
+            sendOutput(`Created file: ${filename} with content`);
+            event.sender.send("command-complete", { code: 0 });
+            resolve({ output: "", errorOutput: "", code: 0 });
+            return;
+          } catch (err) {
+            sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 });
+            resolve({ output: "", errorOutput: err.message, code: 1 });
+            return;
+          }
+
+        case "grep":
+          try {
+            let pattern = '';
+            let targetFile = '';
+            let isRecursive = false;
+            let isCaseInsensitive = false;
+            
+            // Parse grep arguments
+            for (let i = 1; i < args.length; i++) {
+              if (args[i].startsWith('-')) {
+                if (args[i].includes('r')) isRecursive = true;
+                if (args[i].includes('i')) isCaseInsensitive = true;
+                continue;
+              }
+              if (!pattern) {
+                pattern = args[i];
+              } else {
+                targetFile = args[i];
+              }
+            }
+
+            const filePath = path.join(currentWorkingDirectory, targetFile);
+            
+            if (!fs.existsSync(filePath)) {
+              sendOutput(`File ${targetFile} does not exist`);
+              event.sender.send("command-complete", { code: 1 });
+              resolve({ output: "", errorOutput: "File does not exist", code: 1 });
+              return;
+            }
+
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const lines = content.split('\n');
+            let foundMatches = false;
+
+            lines.forEach((line, index) => {
+              const testLine = isCaseInsensitive ? line.toLowerCase() : line;
+              const testPattern = isCaseInsensitive ? pattern.toLowerCase() : pattern;
+              
+              if (testLine.includes(testPattern)) {
+                sendOutput(`${index + 1}: ${line}`);
+                foundMatches = true;
+              }
+            });
+
+            if (!foundMatches) {
+              sendOutput(`No matches found in ${targetFile}`);
+            }
+
+            event.sender.send("command-complete", { code: 0 });
+            resolve({ output: "", errorOutput: "", code: 0 });
+            return;
+          } catch (err) {
+            sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 });
+            resolve({ output: "", errorOutput: err.message, code: 1 });
+            return;
+          }
+
+        case "touch":
+          try {
+            if (!args[1]) {
+              throw new Error("touch: missing operand");
+            }
+            const filePath = path.join(currentWorkingDirectory, args[1]);
+            fs.writeFileSync(filePath, '', { flag: 'w' });
+            sendOutput(`Created file: ${args[1]}`);
+            event.sender.send("command-complete", { code: 0 });
+            resolve({ output: "", errorOutput: "", code: 0 });
+            return;
+          } catch (err) {
+            sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 });
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
@@ -148,7 +257,7 @@ function createWindow() {
 
               deleteRecursive(targetPath);
               sendOutput(`Removed: ${target}`);
-              event.sender.send("command-complete", { code: 0 }); // Added
+              event.sender.send("command-complete", { code: 0 });
               resolve({ output: "", errorOutput: "", code: 0 });
               return;
             } else {
@@ -159,7 +268,7 @@ function createWindow() {
                   fs.unlinkSync(targetPath);
                 }
                 sendOutput(`Removed: ${target}`);
-                event.sender.send("command-complete", { code: 0 }); // Added
+                event.sender.send("command-complete", { code: 0 });
                 resolve({ output: "", errorOutput: "", code: 0 });
                 return;
               } else {
@@ -170,7 +279,7 @@ function createWindow() {
             }
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 }); // Added
+            event.sender.send("command-complete", { code: 1 });
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
@@ -186,6 +295,13 @@ function createWindow() {
           } else {
             shell = "/bin/bash";
             shellArgs = ["-c", command];
+          }
+
+          // For multiple commands, join them with &&
+          if (command.includes('\n')) {
+            const commands = command.split('\n').filter(cmd => cmd.trim());
+            const joinedCommand = commands.join(' && ');
+            shellArgs[1] = joinedCommand;
           }
 
           const cmdProcess = spawn(shell, shellArgs, {
@@ -220,7 +336,8 @@ function createWindow() {
     try {
       const newPath = path.resolve(currentWorkingDirectory, directory);
       if (fs.existsSync(newPath) && fs.statSync(newPath).isDirectory()) {
-        currentWorkingDirectory = newPath;
+        process.chdir(newPath); // Change process working directory
+        currentWorkingDirectory = newPath; // Update our stored path
         return { success: true };
       } else {
         return { success: false, message: "Directory does not exist" };
