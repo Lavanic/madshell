@@ -17,7 +17,6 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    backgroundColor: "#1E1E2E",
     vibrancy: "dark",
     visualEffectState: "active",
     roundedCorners: true,
@@ -58,6 +57,7 @@ function createWindow() {
         case "clear":
           // Send special clear command to terminal
           event.sender.send("clear-terminal");
+          event.sender.send("command-complete", { code: 0 }); // Added
           resolve({ output: "", errorOutput: "", code: 0 });
           return;
 
@@ -77,23 +77,30 @@ function createWindow() {
               .join(" ");
 
             sendOutput(output);
+            event.sender.send("command-complete", { code: 0 }); // Added
             resolve({ output, errorOutput: "", code: 0 });
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 }); // Added
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
 
         case "mkdir":
           try {
+            if (!args[1]) {
+              throw new Error("mkdir: missing operand");
+            }
             const dirPath = path.join(currentWorkingDirectory, args[1]);
             fs.mkdirSync(dirPath);
             sendOutput(`Directory created: ${args[1]}`);
+            event.sender.send("command-complete", { code: 0 }); // Added
             resolve({ output: "", errorOutput: "", code: 0 });
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 }); // Added
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
@@ -101,6 +108,7 @@ function createWindow() {
         case "pwd":
           try {
             sendOutput(currentWorkingDirectory);
+            event.sender.send("command-complete", { code: 0 }); // Added
             resolve({
               output: currentWorkingDirectory,
               errorOutput: "",
@@ -109,12 +117,16 @@ function createWindow() {
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 }); // Added
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
 
         case "rm":
           try {
+            if (!args[1]) {
+              throw new Error("rm: missing operand");
+            }
             const isRecursive = args.includes("-rf") || args.includes("-r");
             const target = args[args.length - 1];
             const targetPath = path.join(currentWorkingDirectory, target);
@@ -136,6 +148,7 @@ function createWindow() {
 
               deleteRecursive(targetPath);
               sendOutput(`Removed: ${target}`);
+              event.sender.send("command-complete", { code: 0 }); // Added
               resolve({ output: "", errorOutput: "", code: 0 });
               return;
             } else {
@@ -146,12 +159,18 @@ function createWindow() {
                   fs.unlinkSync(targetPath);
                 }
                 sendOutput(`Removed: ${target}`);
+                event.sender.send("command-complete", { code: 0 }); // Added
                 resolve({ output: "", errorOutput: "", code: 0 });
                 return;
+              } else {
+                throw new Error(
+                  `rm: cannot remove '${target}': No such file or directory`
+                );
               }
             }
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
+            event.sender.send("command-complete", { code: 1 }); // Added
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
@@ -174,24 +193,19 @@ function createWindow() {
             shell: true,
           });
 
-          let output = "";
-          let errorOutput = "";
-
           cmdProcess.stdout.on("data", (data) => {
-            const str = data.toString();
-            output += str;
-            sendOutput(str);
+            event.sender.send("command-output", data.toString());
           });
 
           cmdProcess.stderr.on("data", (data) => {
-            const str = data.toString();
-            errorOutput += str;
-            sendOutput(str);
+            event.sender.send("command-output", data.toString());
           });
 
           cmdProcess.on("close", (code) => {
-            resolve({ output, errorOutput, code });
+            event.sender.send("command-complete", { code });
+            resolve({ code });
           });
+          break;
       }
     });
   });

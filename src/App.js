@@ -8,7 +8,6 @@ import "xterm/css/xterm.css";
 const TerminalComponent = () => {
   const xtermRef = useRef(null);
   const [terminal, setTerminal] = useState(null);
-  const headerContentRef = useRef("");
   const commandStartTimeRef = useRef(null);
   const [commandHistory, setCommandHistory] = useState([]);
   const [currentCwd, setCurrentCwd] = useState("");
@@ -69,6 +68,7 @@ const TerminalComponent = () => {
       scrollback: 10000,
       minimumContrastRatio: 1,
       padding: 12,
+      convertEol: true,
     });
 
     const fitAddon = new FitAddon();
@@ -86,14 +86,12 @@ const TerminalComponent = () => {
     const asciiArt = `                          .___     .__           .__  .__   \r\n   ____   ____   ____   __| _/_____|  |__   ____ |  | |  |  \r\n  / ___\\ /  _ \\ /  _ \\ / __ |/  ___/  |  \\_/ __ \\|  | |  |  \r\n / /_/  >  <_> |  <_> ) /_/ |\\___ \\|   Y  \\  ___/|  |_|  |__ \r\n \\___  / \\____/ \\____/\\____ /____  >___|  /\\___  >____/____/ \r\n/_____/                    \\/    \\/     \\/     \\/            `;
     term.writeln("\x1b[36m" + asciiArt + "\x1b[0m");
 
-    setTerminal(term);
-
     // Initial CWD fetch
     window.electronAPI.getCwd().then((cwd) => {
       setCurrentCwd(cwd);
     });
 
-    term.write("\r\n Welcome to GoodShell\r\n");
+    term.write("\r\nWelcome to GoodShell\r\n");
     prompt(term);
 
     let commandBuffer = "";
@@ -102,21 +100,21 @@ const TerminalComponent = () => {
       const code = data.charCodeAt(0);
 
       if (code === 13) {
+        // Enter key
         term.write("\r\n");
         const command = commandBuffer.trim();
-        if (command) {
-          commandStartTimeRef.current = Date.now();
-        }
         handleCommand(command, term);
         commandBuffer = "";
       } else if (code === 127) {
+        // Backspace
         if (commandBuffer.length > 0) {
           commandBuffer = commandBuffer.slice(0, -1);
           term.write("\b \b");
         }
       } else if (code === 9) {
-        // Future tab completion
+        // Tab key (future tab completion)
       } else if (code >= 32) {
+        // Printable characters
         commandBuffer += data;
         term.write(data);
       }
@@ -134,17 +132,14 @@ const TerminalComponent = () => {
     };
   }, []);
 
-  const writeCommandHeader = (term, command) => {
+  const writeCommandHeader = async (term) => {
+    const cwd = await window.electronAPI.getCwd();
     const timestamp = formatTimestamp(new Date());
-    const header = `\x1b[90m${timestamp} in ${currentCwd}\x1b[0m\r\n`;
+    const header = `\x1b[90m${timestamp} in ${cwd}\x1b[0m\r\n`;
     term.write(header);
-    term.write(`\x1b[94m❯\x1b[0m ${command}\r\n`);
   };
 
-  const writeCommandResult = (term, output, duration) => {
-    if (output && output.length > 0) {
-      term.write(`${output}\r\n`);
-    }
+  const writeCommandResult = (term, duration) => {
     if (duration) {
       term.write(`\x1b[90mCompleted in ${formatDuration(duration)}\x1b[0m\r\n`);
     }
@@ -153,9 +148,33 @@ const TerminalComponent = () => {
   const prompt = async (term) => {
     const cwd = await window.electronAPI.getCwd();
     setCurrentCwd(cwd);
-    const dir = cwd.split("/").pop();
+    const dir = cwd.split(/[\\/]/).pop();
     term.write(`\x1b[38;2;137;180;250m${dir} ❯\x1b[0m `);
   };
+
+  const handleOutput = (data) => {
+    if (typeof data === "string") {
+      terminal.write(data);
+    }
+  };
+
+  const handleCommandComplete = () => {
+    const duration = Date.now() - commandStartTimeRef.current;
+    writeCommandResult(terminal, duration);
+    prompt(terminal);
+  };
+
+  useEffect(() => {
+    if (terminal) {
+      window.electronAPI.onCommandOutput(handleOutput);
+      window.electronAPI.onCommandComplete(handleCommandComplete);
+
+      return () => {
+        window.electronAPI.removeCommandOutputListener(handleOutput);
+        window.electronAPI.removeCommandCompleteListener(handleCommandComplete);
+      };
+    }
+  }, [terminal]);
 
   const handleCommand = async (command, term) => {
     if (command === "") {
@@ -188,42 +207,22 @@ const TerminalComponent = () => {
       return;
     }
 
+    await writeCommandHeader(term);
+
     if (command.startsWith("cd ")) {
-      writeCommandHeader(term, command);
       const directory = command.slice(3).trim();
       const result = await window.electronAPI.changeDirectory(directory);
       if (!result.success) {
         term.writeln(`cd: ${result.message}`);
       }
       const duration = Date.now() - commandStartTimeRef.current;
-      writeCommandResult(term, null, duration);
+      writeCommandResult(term, duration);
       prompt(term);
     } else {
-      writeCommandHeader(term, command);
+      commandStartTimeRef.current = Date.now();
       window.electronAPI.executeCommand(command);
     }
   };
-
-  useEffect(() => {
-    if (terminal) {
-      const handleOutput = async (data) => {
-        if (typeof data === "string") {
-          const duration = Date.now() - commandStartTimeRef.current;
-          const cleanOutput = data.replace(/\r\n/g, "\n").replace(/\n+$/, "");
-          if (cleanOutput.length > 0) {
-            writeCommandResult(terminal, cleanOutput, duration);
-          }
-          prompt(terminal);
-        }
-      };
-
-      window.electronAPI.onCommandOutput(handleOutput);
-
-      return () => {
-        window.electronAPI.removeCommandOutputListener(handleOutput);
-      };
-    }
-  }, [terminal]);
 
   return (
     <div className="terminal-container">

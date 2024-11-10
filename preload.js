@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   removeCommandOutputListener: (callback) => {
     ipcRenderer.removeListener("command-output", callback);
   },
+  onCommandComplete: (callback) => {
+    ipcRenderer.on("command-complete", (event, data) => callback(data));
+  },
+  removeCommandCompleteListener: (callback) => {
+    ipcRenderer.removeListener("command-complete", callback);
+  },
   getCwd: () => ipcRenderer.invoke("get-cwd"),
   changeDirectory: (directory) =>
     ipcRenderer.invoke("change-directory", directory),
