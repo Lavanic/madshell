@@ -67,13 +67,20 @@ const TerminalComponent = () => {
 
   const convertNLQToCommand = async (query) => {
     try {
+      const endpoint = process.env.REACT_APP_DATABRICKS_ENDPOINT;
+      const apiToken = process.env.REACT_APP_DATABRICKS_API_TOKEN;
+
+      if (!endpoint || !apiToken) {
+        throw new Error("Databricks configuration is missing");
+      }
+
       const response = await fetch(
-        "https://adb-2339467812627777.17.azuredatabricks.net/serving-endpoints/mini/invocations",
+        `https://${endpoint}/serving-endpoints/mini/invocations`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: "Bearer dapi9b39fc45ec485600ccff5bb8c089c3a1-3",
+            Authorization: `Bearer ${apiToken}`,
           },
           body: JSON.stringify({
             messages: [
