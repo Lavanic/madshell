@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, exec } = require("child_process"); // Add exec here
 const fs = require("fs");
 
 // Store the current working directory and venv path
@@ -409,44 +409,25 @@ function createWindow() {
             
             return;
           }
-        
-          // For other commands, use the shell
-          let shell;
-          let shellArgs;
-        
-          if (process.platform === "win32") {
-            shell = "cmd.exe";
-            shellArgs = ["/c", command];
-          } else {
-            shell = "/bin/bash";
-            shellArgs = ["-c", command];
+          else {
+            // Use exec instead of spawn
+            exec(command, { cwd: currentWorkingDirectory }, (error, stdout, stderr) => {
+              if (stdout) {
+                event.sender.send("command-output", stdout);
+              }
+              if (stderr) {
+                event.sender.send("command-output", stderr);
+              }
+              if (error) {
+                event.sender.send("command-output", error.message);
+                event.sender.send("command-complete", { code: error.code || 1 });
+                resolve({ code: error.code || 1 });
+              } else {
+                event.sender.send("command-complete", { code: 0 });
+                resolve({ code: 0 });
+              }
+            });
           }
-        
-          // For multiple commands, join them with &&
-          if (command.includes('\n')) {
-            const commands = command.split('\n').filter(cmd => cmd.trim());
-            const joinedCommand = commands.join(' && ');
-            shellArgs[1] = joinedCommand;
-          }
-        
-          const cmdProcess = spawn(shell, shellArgs, {
-            cwd: currentWorkingDirectory,
-            shell: true,
-          });
-        
-          cmdProcess.stdout.on("data", (data) => {
-            event.sender.send("command-output", data.toString());
-          });
-        
-          cmdProcess.stderr.on("data", (data) => {
-            event.sender.send("command-output", data.toString());
-          });
-        
-          cmdProcess.on("close", (code) => {
-            event.sender.send("command-complete", { code });
-            resolve({ code });
-          });
-          break;
       }
     });
   });
