@@ -128,22 +128,22 @@ function createWindow() {
             if (!args[1]) {
               throw new Error("write: missing filename");
             }
-            
+
             const filename = args[1];
-            let content = '';
-            
+            let content = "";
+
             // Check if we have heredoc content
-            if (command.includes('<<EOL')) {
-              const parts = command.split('<<EOL\n');
+            if (command.includes("<<EOL")) {
+              const parts = command.split("<<EOL\n");
               if (parts.length >= 2) {
-                content = parts[1].split('\nEOL')[0];
+                content = parts[1].split("\nEOL")[0];
               }
             } else {
-              content = args.slice(2).join(' ');
+              content = args.slice(2).join(" ");
             }
-            
+
             const filePath = path.join(currentWorkingDirectory, filename);
-            fs.writeFileSync(filePath, content + '\n', { flag: 'w' });
+            fs.writeFileSync(filePath, content + "\n", { flag: "w" });
             sendOutput(`Created file: ${filename} with content`);
             event.sender.send("command-complete", { code: 0 });
             resolve({ output: "", errorOutput: "", code: 0 });
@@ -157,16 +157,16 @@ function createWindow() {
 
         case "grep":
           try {
-            let pattern = '';
-            let targetFile = '';
+            let pattern = "";
+            let targetFile = "";
             let isRecursive = false;
             let isCaseInsensitive = false;
-            
+
             // Parse grep arguments
             for (let i = 1; i < args.length; i++) {
-              if (args[i].startsWith('-')) {
-                if (args[i].includes('r')) isRecursive = true;
-                if (args[i].includes('i')) isCaseInsensitive = true;
+              if (args[i].startsWith("-")) {
+                if (args[i].includes("r")) isRecursive = true;
+                if (args[i].includes("i")) isCaseInsensitive = true;
                 continue;
               }
               if (!pattern) {
@@ -177,22 +177,28 @@ function createWindow() {
             }
 
             const filePath = path.join(currentWorkingDirectory, targetFile);
-            
+
             if (!fs.existsSync(filePath)) {
               sendOutput(`File ${targetFile} does not exist`);
               event.sender.send("command-complete", { code: 1 });
-              resolve({ output: "", errorOutput: "File does not exist", code: 1 });
+              resolve({
+                output: "",
+                errorOutput: "File does not exist",
+                code: 1,
+              });
               return;
             }
 
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const lines = content.split('\n');
+            const content = fs.readFileSync(filePath, "utf-8");
+            const lines = content.split("\n");
             let foundMatches = false;
 
             lines.forEach((line, index) => {
               const testLine = isCaseInsensitive ? line.toLowerCase() : line;
-              const testPattern = isCaseInsensitive ? pattern.toLowerCase() : pattern;
-              
+              const testPattern = isCaseInsensitive
+                ? pattern.toLowerCase()
+                : pattern;
+
               if (testLine.includes(testPattern)) {
                 sendOutput(`${index + 1}: ${line}`);
                 foundMatches = true;
@@ -219,7 +225,7 @@ function createWindow() {
               throw new Error("touch: missing operand");
             }
             const filePath = path.join(currentWorkingDirectory, args[1]);
-            fs.writeFileSync(filePath, '', { flag: 'w' });
+            fs.writeFileSync(filePath, "", { flag: "w" });
             sendOutput(`Created file: ${args[1]}`);
             event.sender.send("command-complete", { code: 0 });
             resolve({ output: "", errorOutput: "", code: 0 });
@@ -298,9 +304,9 @@ function createWindow() {
           }
 
           // For multiple commands, join them with &&
-          if (command.includes('\n')) {
-            const commands = command.split('\n').filter(cmd => cmd.trim());
-            const joinedCommand = commands.join(' && ');
+          if (command.includes("\n")) {
+            const commands = command.split("\n").filter((cmd) => cmd.trim());
+            const joinedCommand = commands.join(" && ");
             shellArgs[1] = joinedCommand;
           }
 
@@ -329,6 +335,16 @@ function createWindow() {
   // Handle 'get-cwd' IPC call
   ipcMain.handle("get-cwd", () => {
     return currentWorkingDirectory;
+  });
+
+  ipcMain.handle("get-directory-contents", (event, dirPath) => {
+    try {
+      const fullPath = path.resolve(currentWorkingDirectory, dirPath);
+      const items = fs.readdirSync(fullPath);
+      return items;
+    } catch (err) {
+      return [];
+    }
   });
 
   // Handle 'change-directory' IPC call

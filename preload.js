@@ -18,4 +18,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getCwd: () => ipcRenderer.invoke("get-cwd"),
   changeDirectory: (directory) =>
     ipcRenderer.invoke("change-directory", directory),
+  getDirectoryContents: (dirPath) =>
+    ipcRenderer.invoke("get-directory-contents", dirPath),
+});
+
+contextBridge.exposeInMainWorld("pathAPI", {
+  resolve: (...args) => path.resolve(...args),
+  dirname: (p) => path.dirname(p),
+  basename: (p) => path.basename(p),
+  sep: path.sep,
 });
