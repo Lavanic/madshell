@@ -154,35 +154,46 @@ IMPORTANT:
   };
 
   const renderInputLine = (term, suggestion) => {
+    let output = "";
+
+    // Hide cursor
+    output += "\x1b[?25l";
+
     // Clear the current line
-    term.write("\x1b[2K\r"); // Clear line
+    output += "\x1b[2K\r"; // Clear line and return carriage
 
     // Write prompt
-    term.write(promptRef.current);
+    output += promptRef.current;
 
     // Write user input up to the cursor position
     const inputBeforeCursor = commandBufferRef.current.slice(
       0,
       cursorPositionRef.current
     );
-    term.write(inputBeforeCursor);
+    output += inputBeforeCursor;
 
-    // Set the cursor
-    term.write("\x1b[s"); // Save cursor position
+    // Save cursor position
+    output += "\x1b[s";
 
     // Write the rest of the input
     const inputAfterCursor = commandBufferRef.current.slice(
       cursorPositionRef.current
     );
-    term.write(inputAfterCursor);
+    output += inputAfterCursor;
 
     // Write suggestion in gray
     if (suggestion) {
-      term.write("\x1b[90m" + suggestion + "\x1b[0m");
+      output += "\x1b[90m" + suggestion + "\x1b[0m";
     }
 
     // Restore cursor position
-    term.write("\x1b[u"); // Restore cursor position
+    output += "\x1b[u";
+
+    // Show cursor
+    output += "\x1b[?25h";
+
+    // Write everything to the terminal at once
+    term.write(output);
   };
 
   const updateSuggestion = async (term) => {
