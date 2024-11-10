@@ -6,7 +6,9 @@ import { SearchAddon } from "xterm-addon-search";
 import "xterm/css/xterm.css";
 
 const TerminalComponent = () => {
+  const asciiArt = `░▒▓██████████████▓▒░ ░▒▓██████▓▒░░▒▓███████▓▒░ ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░      ░▒▓█▓▒░        \r\n░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        \r\n░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        \r\n░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓█▓▒░      ░▒▓█▓▒░        \r\n░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        \r\n░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        \r\n░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░▒▓████████▓▒░ `;
   const xtermRef = useRef(null);
+  const fitAddonRef = useRef(null);
   const [terminal, setTerminal] = useState(null);
   const commandStartTimeRef = useRef(null);
   const [commandHistory, setCommandHistory] = useState([]);
@@ -20,22 +22,29 @@ const TerminalComponent = () => {
   const historyPositionRef = useRef(-1);
   const currentSuggestionRef = useRef("");
   const promptRef = useRef("");
+  const terminalRef = useRef(null);
+  const typingQueue = useRef([]);
+  const isTyping = useRef(false);
 
   const handleWindowControls = (action) => {
     window.electronAPI.windowControl(action);
   };
 
   const activateVoiceMode = async (term) => {
-    term.write("\r\n\x1b[36mVoice mode activated. Please speak your command.\x1b[0m\r\n");
-  
+    enqueueOutput(
+      "\r\n\x1b[36mVoice mode activated. Please speak your command.\x1b[0m\r\n"
+    );
+
     try {
       const speechResult = await window.electronAPI.startVoiceRecognition();
-      term.write(`\r\n\x1b[32mYou said: ${speechResult}\x1b[0m\r\n`);
-  
+      enqueueOutput(`\r\n\x1b[32mYou said: ${speechResult}\x1b[0m\r\n`);
+
       // Now handle the speechResult as a query
       handleCommand("!" + speechResult, term);
     } catch (error) {
-      term.write(`\r\n\x1b[31mError occurred in recognition: ${error.message}\x1b[0m\r\n`);
+      enqueueOutput(
+        `\r\n\x1b[31mError occurred in recognition: ${error.message}\x1b[0m\r\n`
+      );
       prompt(term);
     }
   };
@@ -122,8 +131,8 @@ IMPORTANT:
       fontSize: 14,
       fontFamily: '"SF Mono", Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: "rgba(24, 24, 27, 0.95)",
-        foreground: "#ffffff",
+        background: "rgba(19, 40, 83, 0.95)", // Updated background color
+        foreground: "#ffffff", // Ensure font color is white
         cursor: "#ffffff",
         cursorAccent: "#000000",
         selection: "rgba(255, 255, 255, 0.3)",
@@ -155,6 +164,9 @@ IMPORTANT:
       padding: 12,
       convertEol: true,
     });
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    fitAddonRef.current = fitAddon;
 
     return term;
   }, []);
@@ -163,9 +175,9 @@ IMPORTANT:
     const cwd = await window.electronAPI.getCwd();
     setCurrentCwd(cwd);
     const dir = cwd.split(/[\\/]/).pop();
-    const promptText = `\x1b[38;2;137;180;250m${dir} ❯\x1b[0m `;
+    const promptText = `\x1b[38;2;255;255;104m${dir} ❯\x1b[0m `;
     promptRef.current = promptText;
-    term.write(promptText);
+    enqueueOutput(promptText);
   };
 
   const renderInputLine = (term, suggestion) => {
@@ -198,7 +210,7 @@ IMPORTANT:
 
     // Write suggestion in gray
     if (suggestion) {
-      output += "\x1b[90m" + suggestion + "\x1b[0m";
+      output += "\x1b[38;2;200;200;200m" + suggestion + "\x1b[0m";
     }
 
     // Restore cursor position
@@ -291,21 +303,18 @@ IMPORTANT:
 
   useEffect(() => {
     const term = initializeTerminal();
-    const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
     const searchAddon = new SearchAddon();
 
-    term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.loadAddon(searchAddon);
 
     term.open(xtermRef.current);
-    fitAddon.fit();
+    if (fitAddonRef.current) {
+      fitAddonRef.current.fit();
+    }
     setTerminal(term);
-
-    const asciiArt = `                          .___     .__           .__  .__   \r\n   ____   ____   ____   __| _/_____|  |__   ____ |  | |  |  \r\n  / ___\\ /  _ \\ /  _ \\ / __ |/  ___/  |  \\_/ __ \\|  | |  |  \r\n / /_/  >  <_> |  <_> ) /_/ |\\___ \\|   Y  \\  ___/|  |_|  |__ \r\n \\___  / \\____/ \\____/\\____ /____  >___|  /\\___  >____/____/ \r\n/_____/                    \\/    \\/     \\/     \\/            `;
-    term.writeln("\x1b[36m" + asciiArt + "\x1b[0m");
-
+    terminalRef.current = term; // Add this line
     // Initialize CWD
     window.electronAPI.getCwd().then((cwd) => {
       setCurrentCwd(cwd);
@@ -320,7 +329,6 @@ IMPORTANT:
 
     term.onKey(async (e) => {
       const { key, domEvent } = e;
-      console.log("Key pressed:", domEvent.key);
       const keyName = domEvent.key;
       const printable =
         !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
@@ -388,9 +396,10 @@ IMPORTANT:
     });
 
     const handleResize = () => {
-      fitAddon.fit();
+      if (terminal && fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
     };
-
     window.addEventListener("resize", handleResize);
 
     return () => {
@@ -399,20 +408,61 @@ IMPORTANT:
     };
   }, []);
 
-  const handleOutput = useCallback(
-    (data) => {
-      if (typeof data === "string" && terminal) {
-        terminal.write(data);
+  const handleOutput = useCallback((data) => {
+    if (typeof data === "string" && terminalRef.current) {
+      typingQueue.current.push(data);
+      if (!isTyping.current) {
+        typeNextOutput();
       }
-    },
-    [terminal]
-  );
+    }
+  }, []);
+
+  const enqueueOutput = (data) => {
+    if (typeof data === "string" && terminalRef.current) {
+      typingQueue.current.push(data);
+      if (!isTyping.current) {
+        typeNextOutput();
+      }
+    }
+  };
+
+  const typeNextOutput = () => {
+    if (typingQueue.current.length === 0) {
+      isTyping.current = false;
+      return;
+    }
+    isTyping.current = true;
+    const data = typingQueue.current.shift();
+    let index = 0;
+
+    const typeChar = () => {
+      if (index < data.length) {
+        terminalRef.current.write(data.charAt(index));
+        index++;
+        setTimeout(typeChar, 3); // Adjust typing speed as desired
+      } else {
+        // After typing the current data, move to the next
+        typeNextOutput();
+      }
+    };
+
+    typeChar();
+  };
 
   const handleCommandComplete = useCallback(() => {
     const duration = Date.now() - commandStartTimeRef.current;
-    writeCommandResult(terminal, duration);
-    prompt(terminal);
-  }, [terminal]);
+    writeCommandResult(duration);
+
+    // Wait for typing to finish before displaying the prompt
+    const checkTyping = () => {
+      if (isTyping.current) {
+        setTimeout(checkTyping, 50);
+      } else {
+        prompt(terminalRef.current);
+      }
+    };
+    checkTyping();
+  }, []);
 
   useEffect(() => {
     if (terminal) {
@@ -426,16 +476,19 @@ IMPORTANT:
     }
   }, [terminal, handleOutput, handleCommandComplete]);
 
-  const writeCommandHeader = async (term) => {
+  const writeCommandHeader = async () => {
     const cwd = await window.electronAPI.getCwd();
     const timestamp = formatTimestamp(new Date());
-    const header = `\x1b[90m${timestamp} in ${cwd}\x1b[0m\r\n`;
-    term.write(header);
+    const header = `\x1b[38;2;200;200;200m${timestamp} in ${cwd}\x1b[0m\r\n`;
+    enqueueOutput(header);
   };
 
-  const writeCommandResult = (term, duration) => {
+  const writeCommandResult = (duration) => {
     if (duration) {
-      term.write(`\x1b[90mCompleted in ${formatDuration(duration)}\x1b[0m\r\n`);
+      const resultText = `\x1b[38;2;200;200;200mCompleted in ${formatDuration(
+        duration
+      )}\x1b[0m\r\n`;
+      enqueueOutput(resultText);
     }
   };
 
@@ -444,6 +497,7 @@ IMPORTANT:
       prompt(term);
       return;
     }
+    commandStartTimeRef.current = Date.now();
 
     if (command.startsWith("!v")) {
       // Activate voice mode
@@ -480,18 +534,20 @@ IMPORTANT:
       });
 
       setIsProcessingNLQ(true);
-      term.write("\r\n\x1b[36mConverting natural language query...\x1b[0m");
+      enqueueOutput("\r\n\x1b[36mConverting natural language query...\x1b[0m");
 
       const shellCommand = await convertNLQToCommand(query);
       setIsProcessingNLQ(false);
 
       if (!shellCommand) {
-        term.write("\r\n\x1b[31mFailed to convert query to command\x1b[0m\r\n");
+        enqueueOutput(
+          "\r\n\x1b[31mFailed to convert query to command\x1b[0m\r\n"
+        );
         prompt(term);
         return;
       }
 
-      term.write(`\r\n\x1b[32mExecuting: ${shellCommand}\x1b[0m\r\n`);
+      enqueueOutput(`\r\n\x1b[32mExecuting: ${shellCommand}\x1b[0m\r\n`);
 
       setCommandHistory((prev) => [
         ...prev,
@@ -528,16 +584,18 @@ IMPORTANT:
       commandHistory.forEach((entry, index) => {
         const timestamp = formatTimestamp(entry.timestamp);
         if (entry.convertedCommand) {
-          term.write(
+          enqueueOutput(
             `${index + 1}  ${timestamp}  \x1b[36m${entry.command}\x1b[0m\r\n`
           );
-          term.write(`   └─ \x1b[32m${entry.convertedCommand}\x1b[0m\r\n`);
+          enqueueOutput(`   └─ \x1b[32m${entry.convertedCommand}\x1b[0m\r\n`);
         } else {
-          term.write(`${index + 1}  ${timestamp}  ${entry.command}\r\n`);
+          enqueueOutput(`${index + 1}  ${timestamp}  ${entry.command}\r\n`);
         }
       });
+      const duration = Date.now() - commandStartTimeRef.current;
+      writeCommandResult(duration);
       prompt(term);
-      return;
+      return; // Add return to prevent further execution
     }
 
     await writeCommandHeader(term);
@@ -574,9 +632,9 @@ IMPORTANT:
             onClick={() => handleWindowControls("maximize")}
           />
         </div>
-        <div className="terminal-title">
-          {isProcessingNLQ ? "Converting query..." : "goodshell"}
-        </div>
+      </div>
+      <div className="ascii-art-header">
+        <pre className="ascii-art">{asciiArt}</pre>
       </div>
       <div className="terminal-content">
         <div ref={xtermRef} className="terminal-wrapper" />

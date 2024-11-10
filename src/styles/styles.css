@@ -3,14 +3,22 @@ body {
   padding: 0;
   background: transparent;
 }
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  width: 100%;
+  height: 100%;
+}
 
 .terminal-container {
   width: 100%;
   height: 100%;
-  background: rgba(24, 24, 27, 0.95);
+  background: rgba(19, 40, 83, 0.95);
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -18,10 +26,15 @@ body {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  background: rgba(9, 9, 11, 0.95); /* Darker header */
+  background: rgba(
+    15,
+    32,
+    66,
+    0.95
+  ); /* Adjusted header background for contrast */
   -webkit-app-region: drag;
   height: 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Subtle separator */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .window-controls {
@@ -76,14 +89,38 @@ body {
   letter-spacing: 0.5px;
 }
 
+.ascii-art-header {
+  text-align: left; /* Align text to the left */
+  background-color: rgba(19, 40, 83, 0.95); /* Match terminal background */
+  color: rgba(255, 255, 255, 0.512);
+  padding-left: 10px; /* Add left padding for wiggle room */
+  flex: 0 0 auto;
+}
+.ascii-art {
+  font-family: monospace;
+  font-size: 6px; /* Set the font size to 6px */
+  margin: 0;
+  line-height: 1;
+  white-space: pre;
+}
+
 .terminal-content {
-  flex: 1;
+  flex: 1 1 auto;
   padding: 0;
+  display: flex;
   overflow: hidden;
+}
+
+.xterm {
+  flex: 1; /* Allow xterm to expand */
 }
 
 .xterm-viewport {
   background-color: transparent !important;
+}
+
+.terminal-wrapper {
+  flex: 1; /* Use flex instead of width and height 100% */
 }
 
 .xterm-screen {

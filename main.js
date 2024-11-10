@@ -12,13 +12,13 @@ let currentVenvPath = null;
 const client = new speech.SpeechClient();
 
 function getGitExecutable() {
-  return process.platform === 'win32' ? 'git' : '/usr/bin/git';
+  return process.platform === "win32" ? "git" : "/usr/bin/git";
 }
 
 // Helper function to check if a command should be run in venv
 function shouldUseVenv(command) {
-  const venvCommands = ['pip', 'python', 'python3', 'pytest', 'jupyter'];
-  return venvCommands.some(cmd => command.startsWith(cmd));
+  const venvCommands = ["pip", "python", "python3", "pytest", "jupyter"];
+  return venvCommands.some((cmd) => command.startsWith(cmd));
 }
 
 function createWindow() {
@@ -27,6 +27,7 @@ function createWindow() {
     height: 600,
     frame: false,
     transparent: true,
+    resizable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -64,27 +65,29 @@ function createWindow() {
       };
 
       // Check if command is multi-line or contains shell operators
-      const isMultiCommand = command.includes('\n');
-      const containsShellOperators = ['&&', '||', ';', '|', '>', '<'].some(op => command.includes(op));
+      const isMultiCommand = command.includes("\n");
+      const containsShellOperators = ["&&", "||", ";", "|", ">", "<"].some(
+        (op) => command.includes(op)
+      );
 
       // Special handling for Python venv creation and activation
-      if (command.includes('python') && command.includes('venv')) {
-        const commands = command.split('\n');
-        let venvName = 'myenv';
+      if (command.includes("python") && command.includes("venv")) {
+        const commands = command.split("\n");
+        let venvName = "myenv";
 
         // Extract venv name if specified
-        const venvCommand = commands.find(cmd => cmd.includes('-m venv'));
+        const venvCommand = commands.find((cmd) => cmd.includes("-m venv"));
         if (venvCommand) {
-          const parts = venvCommand.split(' ');
+          const parts = venvCommand.split(" ");
           venvName = parts[parts.length - 1];
         }
 
         // Create venv
-        const createVenvProcess = spawn('python3', ['-m', 'venv', venvName], {
-          cwd: currentWorkingDirectory
+        const createVenvProcess = spawn("python3", ["-m", "venv", venvName], {
+          cwd: currentWorkingDirectory,
         });
 
-        createVenvProcess.on('close', (code) => {
+        createVenvProcess.on("close", (code) => {
           if (code === 0) {
             // Store the venv path for future use
             currentVenvPath = path.join(currentWorkingDirectory, venvName);
@@ -94,31 +97,35 @@ function createWindow() {
             // Execute any additional commands in the venv context
             const remainingCommands = commands.slice(2); // Skip venv creation and activation
             if (remainingCommands.length > 0) {
-              const binPath = process.platform === 'win32' ? 'Scripts' : 'bin';
-              const pipPath = path.join(currentVenvPath, binPath, 'pip');
+              const binPath = process.platform === "win32" ? "Scripts" : "bin";
+              const pipPath = path.join(currentVenvPath, binPath, "pip");
 
-              remainingCommands.forEach(cmd => {
-                if (cmd.startsWith('pip')) {
-                  const pipProcess = spawn(pipPath, cmd.split(' ').slice(1), {
-                    cwd: currentWorkingDirectory
+              remainingCommands.forEach((cmd) => {
+                if (cmd.startsWith("pip")) {
+                  const pipProcess = spawn(pipPath, cmd.split(" ").slice(1), {
+                    cwd: currentWorkingDirectory,
                   });
 
-                  pipProcess.stdout.on('data', (data) => sendOutput(data.toString()));
-                  pipProcess.stderr.on('data', (data) => sendOutput(data.toString()));
+                  pipProcess.stdout.on("data", (data) =>
+                    sendOutput(data.toString())
+                  );
+                  pipProcess.stderr.on("data", (data) =>
+                    sendOutput(data.toString())
+                  );
 
-                  pipProcess.on('close', (code) => {
-                    event.sender.send('command-complete', { code });
+                  pipProcess.on("close", (code) => {
+                    event.sender.send("command-complete", { code });
                     resolve({ code });
                   });
                 }
               });
             } else {
-              event.sender.send('command-complete', { code: 0 });
+              event.sender.send("command-complete", { code: 0 });
               resolve({ code: 0 });
             }
           } else {
-            sendOutput('Failed to create virtual environment\n');
-            event.sender.send('command-complete', { code: 1 });
+            sendOutput("Failed to create virtual environment\n");
+            event.sender.send("command-complete", { code: 1 });
             resolve({ code: 1 });
           }
         });
@@ -130,27 +137,30 @@ function createWindow() {
       if (isMultiCommand || containsShellOperators) {
         // Handle multi-line commands
         if (isMultiCommand) {
-          const commands = command.split('\n').filter(cmd => cmd.trim());
-          command = commands.join(' && ');
+          const commands = command.split("\n").filter((cmd) => cmd.trim());
+          command = commands.join(" && ");
         }
 
         // Use exec to execute the command
-        exec(command, { cwd: currentWorkingDirectory }, (error, stdout, stderr) => {
-          if (stdout) {
-            event.sender.send("command-output", stdout);
+        exec(
+          command,
+          { cwd: currentWorkingDirectory },
+          (error, stdout, stderr) => {
+            if (stdout) {
+              event.sender.send("command-output", stdout);
+            }
+            if (stderr) {
+              event.sender.send("command-output", stderr);
+            }
+            if (error) {
+              event.sender.send("command-complete", { code: error.code || 1 });
+              resolve({ code: error.code || 1 });
+            } else {
+              event.sender.send("command-complete", { code: 0 });
+              resolve({ code: 0 });
+            }
           }
-          if (stderr) {
-            event.sender.send("command-output", stderr);
-          }
-          if (error) {
-            event.sender.send("command-output", error.message);
-            event.sender.send("command-complete", { code: error.code || 1 });
-            resolve({ code: error.code || 1 });
-          } else {
-            event.sender.send("command-complete", { code: 0 });
-            resolve({ code: 0 });
-          }
-        });
+        );
         return;
       }
 
@@ -158,19 +168,19 @@ function createWindow() {
       if (currentVenvPath && shouldUseVenv(command)) {
         const args = command.trim().split(/\s+/);
         const cmd = args[0];
-        const binPath = process.platform === 'win32' ? 'Scripts' : 'bin';
+        const binPath = process.platform === "win32" ? "Scripts" : "bin";
         const commandPath = path.join(currentVenvPath, binPath, cmd);
 
         if (fs.existsSync(commandPath)) {
           const venvProcess = spawn(commandPath, args.slice(1), {
-            cwd: currentWorkingDirectory
+            cwd: currentWorkingDirectory,
           });
 
-          venvProcess.stdout.on('data', (data) => sendOutput(data.toString()));
-          venvProcess.stderr.on('data', (data) => sendOutput(data.toString()));
+          venvProcess.stdout.on("data", (data) => sendOutput(data.toString()));
+          venvProcess.stderr.on("data", (data) => sendOutput(data.toString()));
 
-          venvProcess.on('close', (code) => {
-            event.sender.send('command-complete', { code });
+          venvProcess.on("close", (code) => {
+            event.sender.send("command-complete", { code });
             resolve({ code });
           });
 
@@ -238,48 +248,54 @@ function createWindow() {
 
         default:
           // Special handling for git commands
-          if (command.startsWith('git ')) {
+          if (command.startsWith("git ")) {
             const gitPath = getGitExecutable();
-            const gitArgs = args.slice(1);  // Remove 'git' from args
+            const gitArgs = args.slice(1); // Remove 'git' from args
 
             const cmdProcess = spawn(gitPath, gitArgs, {
               cwd: currentWorkingDirectory,
               env: { ...process.env, PATH: process.env.PATH },
-              shell: false
+              shell: false,
             });
 
-            cmdProcess.stdout.on('data', (data) => {
-              event.sender.send('command-output', data.toString());
+            cmdProcess.stdout.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
             });
 
-            cmdProcess.stderr.on('data', (data) => {
-              event.sender.send('command-output', data.toString());
+            cmdProcess.stderr.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
             });
 
-            cmdProcess.on('close', (code) => {
-              event.sender.send('command-complete', { code });
+            cmdProcess.on("close", (code) => {
+              event.sender.send("command-complete", { code });
               resolve({ code });
             });
 
             return;
           } else {
             // For other commands, use exec
-            exec(command, { cwd: currentWorkingDirectory }, (error, stdout, stderr) => {
-              if (stdout) {
-                event.sender.send("command-output", stdout);
+            exec(
+              command,
+              { cwd: currentWorkingDirectory },
+              (error, stdout, stderr) => {
+                if (stdout) {
+                  event.sender.send("command-output", stdout);
+                }
+                if (stderr) {
+                  event.sender.send("command-output", stderr);
+                }
+                if (error) {
+                  event.sender.send("command-output", error.message);
+                  event.sender.send("command-complete", {
+                    code: error.code || 1,
+                  });
+                  resolve({ code: error.code || 1 });
+                } else {
+                  event.sender.send("command-complete", { code: 0 });
+                  resolve({ code: 0 });
+                }
               }
-              if (stderr) {
-                event.sender.send("command-output", stderr);
-              }
-              if (error) {
-                event.sender.send("command-output", error.message);
-                event.sender.send("command-complete", { code: error.code || 1 });
-                resolve({ code: error.code || 1 });
-              } else {
-                event.sender.send("command-complete", { code: 0 });
-                resolve({ code: 0 });
-              }
-            });
+            );
           }
       }
     });
@@ -329,8 +345,8 @@ function createWindow() {
 
       // Stop recording after silence is detected
       // The 'end' event is emitted when recording stops
-      recordingStream.on('end', () => {
-        console.log('Recording ended');
+      recordingStream.on("end", () => {
+        console.log("Recording ended");
       });
     });
   });
@@ -371,13 +387,15 @@ app.whenReady().then(() => {
   createWindow();
 
   app.on("web-contents-created", (event, contents) => {
-    contents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-      if (permission === "media") {
-        callback(true); // Approve microphone access
-      } else {
-        callback(false);
+    contents.session.setPermissionRequestHandler(
+      (webContents, permission, callback) => {
+        if (permission === "media") {
+          callback(true); // Approve microphone access
+        } else {
+          callback(false);
+        }
       }
-    });
+    );
   });
 });
 
