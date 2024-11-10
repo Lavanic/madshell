@@ -30,7 +30,7 @@ const TerminalComponent = () => {
     window.electronAPI.windowControl(action);
   };
 
-  const activateVoiceMode = async (term) => {
+  const activateVoiceMode = async () => {
     enqueueOutput(
       "\r\n\x1b[36mVoice mode activated. Please speak your command.\x1b[0m\r\n"
     );
@@ -40,12 +40,12 @@ const TerminalComponent = () => {
       enqueueOutput(`\r\n\x1b[32mYou said: ${speechResult}\x1b[0m\r\n`);
 
       // Now handle the speechResult as a query
-      handleCommand("!" + speechResult, term);
+      handleCommand("!" + speechResult);
     } catch (error) {
       enqueueOutput(
         `\r\n\x1b[31mError occurred in recognition: ${error.message}\x1b[0m\r\n`
       );
-      prompt(term);
+      prompt();
     }
   };
 
@@ -171,7 +171,7 @@ IMPORTANT:
     return term;
   }, []);
 
-  const prompt = async (term) => {
+  const prompt = async () => {
     const cwd = await window.electronAPI.getCwd();
     setCurrentCwd(cwd);
     const dir = cwd.split(/[\\/]/).pop();
@@ -410,7 +410,7 @@ IMPORTANT:
 
   const handleOutput = useCallback((data) => {
     if (typeof data === "string" && terminalRef.current) {
-      typingQueue.current.push(data);
+      typingQueue.current.push({ data, resolve: () => {} });
       if (!isTyping.current) {
         typeNextOutput();
       }
@@ -418,12 +418,16 @@ IMPORTANT:
   }, []);
 
   const enqueueOutput = (data) => {
-    if (typeof data === "string" && terminalRef.current) {
-      typingQueue.current.push(data);
-      if (!isTyping.current) {
-        typeNextOutput();
+    return new Promise((resolve) => {
+      if (typeof data === "string" && terminalRef.current) {
+        typingQueue.current.push({ data, resolve });
+        if (!isTyping.current) {
+          typeNextOutput();
+        }
+      } else {
+        resolve();
       }
-    }
+    });
   };
 
   const typeNextOutput = () => {
@@ -432,7 +436,7 @@ IMPORTANT:
       return;
     }
     isTyping.current = true;
-    const data = typingQueue.current.shift();
+    const { data, resolve } = typingQueue.current.shift();
     let index = 0;
 
     const typeChar = () => {
@@ -441,13 +445,49 @@ IMPORTANT:
         index++;
         setTimeout(typeChar, 3); // Adjust typing speed as desired
       } else {
-        // After typing the current data, move to the next
+        // After typing the current data, resolve the promise
+        resolve();
+        // Then move to the next
         typeNextOutput();
       }
     };
 
     typeChar();
   };
+
+  const loadingIntervalRef = useRef(null);
+
+  const startLoadingAnimation = () => {
+    const loadingFrames = ["✨", "✨✨", "✨✨✨", "✨✨✨✨", "✨✨✨✨✨"];
+    let frameIndex = 0;
+
+    loadingIntervalRef.current = setInterval(() => {
+      // Move cursor to the beginning of the line and overwrite
+      terminalRef.current.write(
+        `\r\x1b[K\x1b[36mConverting natural language query... ${loadingFrames[frameIndex]}\x1b[0m`
+      );
+      frameIndex = (frameIndex + 1) % loadingFrames.length;
+    }, 300); // Adjust interval as desired
+  };
+
+  const stopLoadingAnimation = () => {
+    if (loadingIntervalRef.current) {
+      clearInterval(loadingIntervalRef.current);
+      loadingIntervalRef.current = null;
+      // Overwrite the line with the final message
+      terminalRef.current.write(
+        `\r\x1b[K\x1b[36mConverting natural language query... done!\x1b[0m\r\n`
+      );
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleCommandComplete = useCallback(() => {
     const duration = Date.now() - commandStartTimeRef.current;
@@ -458,7 +498,7 @@ IMPORTANT:
       if (isTyping.current) {
         setTimeout(checkTyping, 50);
       } else {
-        prompt(terminalRef.current);
+        prompt();
       }
     };
     checkTyping();
@@ -520,23 +560,19 @@ IMPORTANT:
     if (command.startsWith("!")) {
       const query = command.slice(1).trim();
 
-      const newEntry = {
-        command: `!${query}`,
-        convertedCommand: shellCommand,
-        timestamp: new Date(),
-        cwd: currentCwd,
-      };
-
-      setCommandHistory((prev) => {
-        const newHistory = [...prev, newEntry];
-        commandHistoryRef.current = newHistory;
-        return newHistory;
-      });
-
       setIsProcessingNLQ(true);
-      enqueueOutput("\r\n\x1b[36mConverting natural language query...\x1b[0m");
+
+      // Wait for the typing of the message to complete
+      await enqueueOutput(
+        "\r\n\x1b[36mConverting natural language query...\x1b[0m"
+      );
+
+      startLoadingAnimation();
 
       const shellCommand = await convertNLQToCommand(query);
+
+      stopLoadingAnimation();
+
       setIsProcessingNLQ(false);
 
       if (!shellCommand) {
@@ -559,8 +595,7 @@ IMPORTANT:
         },
       ]);
 
-      await writeCommandHeader(term);
-      commandStartTimeRef.current = Date.now();
+      await writeCommandHeader();
       window.electronAPI.executeCommand(shellCommand);
       return;
     }
@@ -609,6 +644,7 @@ IMPORTANT:
       const duration = Date.now() - commandStartTimeRef.current;
       writeCommandResult(term, duration);
       prompt(term);
+      return; // Add this return
     } else {
       commandStartTimeRef.current = Date.now();
       window.electronAPI.executeCommand(command);
