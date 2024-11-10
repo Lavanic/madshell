@@ -52,31 +52,36 @@ const TerminalComponent = () => {
               {
                 role: "system",
                 content: `You are a command line interface expert. Convert natural language queries into shell commands.
-For file creation with content, use a series of echo commands with >>
+For file creation with content, use heredoc syntax with 'cat << EOF > filename' and include the content between 'EOF' markers.
 
 Examples:
 
 "create a python file with two sum solution":
-echo "def twoSum(nums, target):" > twosum.py
-echo "    if len(nums) <= 1:" >> twosum.py
-echo "        return False" >> twosum.py
-echo "    buff_dict = {}" >> twosum.py
-echo "    for i, num in enumerate(nums):" >> twosum.py
-echo "        if num in buff_dict:" >> twosum.py
-echo "            return [buff_dict[num], i]" >> twosum.py
-echo "        buff_dict[target - num] = i" >> twosum.py
-echo "    return []" >> twosum.py
+cat << EOF > twosum.py
+def twoSum(nums, target):
+    if len(nums) <= 1:
+        return False
+    buff_dict = {}
+    for i, num in enumerate(nums):
+        if num in buff_dict:
+            return [buff_dict[num], i]
+        buff_dict[target - num] = i
+    return []
+EOF
 
 "create a text file with hello world":
-echo "Hello, World!" > hello.txt
+cat << EOF > hello.txt
+Hello, World!
+EOF
 
 Current directory: ${currentCwd}
 
 IMPORTANT:
-1. Use echo commands with > for first line and >> for subsequent lines
-2. Preserve proper indentation in the echo strings
-3. Return only the commands, no explanations or formatting
-4. Each echo on its own line`,
+1. Use 'cat << EOF > filename' to write multiple lines to a file.
+2. Do not include unnecessary quotes around the code unless required.
+3. Preserve proper indentation in the code.
+4. Return only the commands, no explanations or formatting.
+5. Each command on its own line.`,
               },
               {
                 role: "user",
