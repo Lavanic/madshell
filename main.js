@@ -74,7 +74,7 @@ function createWindow() {
                 const suffix = isDir ? "/" : "";
                 return `${colorCode}${file}${suffix}\x1b[0m`;
               })
-              .join(" ");
+              .join("\n");
 
             sendOutput(output);
             event.sender.send("command-complete", { code: 0 }); // Added
