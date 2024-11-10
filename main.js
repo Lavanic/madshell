@@ -1,3 +1,4 @@
+// main.js
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -56,110 +57,56 @@ function createWindow() {
 
   // Handle command execution
   ipcMain.handle("execute-command", async (event, command) => {
-    return new Promise((resolve) => {
-      const args = command.trim().split(/\s+/);
-      const cmd = args[0];
+    // Split the command into individual lines/commands
+    const commands = command.split(/\r?\n/).filter((cmd) => cmd.trim() !== "");
 
-      // Function to send output without extra spacing
-      const sendOutput = (text) => {
-        // Remove any existing trailing newlines and add just one
-        const cleanOutput = text.replace(/\r?\n$/, "") + "\n";
-        event.sender.send("command-output", cleanOutput);
-      };
+    // Iterate through each command sequentially
+    for (let cmd of commands) {
+      cmd = cmd.trim();
+      if (cmd === "") continue; // Skip empty lines
 
-      // Special handling for Python venv creation and activation
-      if (command.includes("python") && command.includes("venv")) {
-        const commands = command.split("\n");
-        let venvName = "myenv";
+      const args = cmd.split(/\s+/);
+      const baseCmd = args[0].toLowerCase();
 
-        // Extract venv name if specified
-        const venvCommand = commands.find((cmd) => cmd.includes("-m venv"));
-        if (venvCommand) {
-          const parts = venvCommand.split(" ");
-          venvName = parts[parts.length - 1];
+      // Logging for debugging
+      console.log(`Executing command: ${cmd}`);
+
+      // Handle 'cd' command separately
+      if (baseCmd === "cd") {
+        const directory = args.slice(1).join(" ");
+        const result = await ipcMain.handle(
+          "change-directory",
+          event,
+          directory
+        );
+        if (!result.success) {
+          event.sender.send("command-output", `cd: ${result.message}\n`);
+        } else {
+          event.sender.send(
+            "command-output",
+            `Changed directory to ${currentWorkingDirectory}\n`
+          );
         }
-
-        // Create venv
-        const createVenvProcess = spawn("python3", ["-m", "venv", venvName], {
-          cwd: currentWorkingDirectory,
-        });
-
-        createVenvProcess.on("close", (code) => {
-          if (code === 0) {
-            // Store the venv path for future use
-            currentVenvPath = path.join(currentWorkingDirectory, venvName);
-            sendOutput(`Created virtual environment: ${venvName}\n`);
-            sendOutput(`Virtual environment activated: ${venvName}\n`);
-
-            // Execute any additional commands in the venv context
-            const remainingCommands = commands.slice(2); // Skip venv creation and activation
-            if (remainingCommands.length > 0) {
-              const binPath = process.platform === "win32" ? "Scripts" : "bin";
-              const pipPath = path.join(currentVenvPath, binPath, "pip");
-
-              remainingCommands.forEach((cmd) => {
-                if (cmd.startsWith("pip")) {
-                  const pipProcess = spawn(pipPath, cmd.split(" ").slice(1), {
-                    cwd: currentWorkingDirectory,
-                  });
-
-                  pipProcess.stdout.on("data", (data) =>
-                    sendOutput(data.toString())
-                  );
-                  pipProcess.stderr.on("data", (data) =>
-                    sendOutput(data.toString())
-                  );
-
-                  pipProcess.on("close", (code) => {
-                    event.sender.send("command-complete", { code });
-                    resolve({ code });
-                  });
-                }
-              });
-            } else {
-              event.sender.send("command-complete", { code: 0 });
-              resolve({ code: 0 });
-            }
-          } else {
-            sendOutput("Failed to create virtual environment\n");
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ code: 1 });
-          }
-        });
-
-        return;
-      }
-
-      // For regular commands that should use venv
-      if (currentVenvPath && shouldUseVenv(command)) {
-        const binPath = process.platform === "win32" ? "Scripts" : "bin";
-        const commandPath = path.join(currentVenvPath, binPath, cmd);
-
-        if (fs.existsSync(commandPath)) {
-          const venvProcess = spawn(commandPath, args.slice(1), {
-            cwd: currentWorkingDirectory,
-          });
-
-          venvProcess.stdout.on("data", (data) => sendOutput(data.toString()));
-          venvProcess.stderr.on("data", (data) => sendOutput(data.toString()));
-
-          venvProcess.on("close", (code) => {
-            event.sender.send("command-complete", { code });
-            resolve({ code });
-          });
-
-          return;
-        }
+        continue; // Move to the next command
       }
 
       // Handle built-in commands
-      switch (cmd) {
-        case "clear":
-          // Send special clear command to terminal
-          event.sender.send("clear-terminal");
-          event.sender.send("command-complete", { code: 0 });
-          resolve({ output: "", errorOutput: "", code: 0 });
-          return;
+      switch (baseCmd) {
+        case "mkdir":
+          try {
+            if (!args[1]) {
+              throw new Error("mkdir: missing operand");
+            }
+            const dirPath = path.join(currentWorkingDirectory, args[1]);
+            fs.mkdirSync(dirPath);
+            event.sender.send(
+              "command-output",
+              `Directory created: ${args[1]}\n`
+            );
+          } catch (err) {
+            event.sender.send("command-output", `Error: ${err.message}\n`);
+          }
+          break;
 
         case "ls":
           try {
@@ -175,66 +122,37 @@ function createWindow() {
                 return `${colorCode}${file}${suffix}\x1b[0m`;
               })
               .join("\n");
-
-            sendOutput(output);
-            event.sender.send("command-complete", { code: 0 });
-            resolve({ output, errorOutput: "", code: 0 });
-            return;
+            event.sender.send("command-output", `${output}\n`);
           } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
+            event.sender.send("command-output", `Error: ${err.message}\n`);
           }
-
-        case "mkdir":
-          try {
-            if (!args[1]) {
-              throw new Error("mkdir: missing operand");
-            }
-            const dirPath = path.join(currentWorkingDirectory, args[1]);
-            fs.mkdirSync(dirPath);
-            sendOutput(`Directory created: ${args[1]}`);
-            event.sender.send("command-complete", { code: 0 });
-            resolve({ output: "", errorOutput: "", code: 0 });
-            return;
-          } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
-          }
+          break;
 
         case "pwd":
           try {
-            sendOutput(currentWorkingDirectory);
-            event.sender.send("command-complete", { code: 0 });
-            resolve({
-              output: currentWorkingDirectory,
-              errorOutput: "",
-              code: 0,
-            });
-            return;
+            event.sender.send("command-output", `${currentWorkingDirectory}\n`);
           } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
+            event.sender.send("command-output", `Error: ${err.message}\n`);
           }
+          break;
+
+        case "clear":
+          // Send 'clear-terminal' event to renderer to clear the terminal
+          event.sender.send("clear-terminal");
+          break;
 
         case "write":
         case "create":
           try {
             if (!args[1]) {
-              throw new Error("write: missing filename");
+              throw new Error(`${baseCmd}: missing filename`);
             }
-
             const filename = args[1];
             let content = "";
 
-            // Check if we have heredoc content
-            if (command.includes("<<EOL")) {
-              const parts = command.split("<<EOL\n");
+            // Check if we have heredoc content (optional, based on AI's output)
+            if (cmd.includes("<<EOL")) {
+              const parts = cmd.split("<<EOL\n");
               if (parts.length >= 2) {
                 content = parts[1].split("\nEOL")[0];
               }
@@ -242,18 +160,16 @@ function createWindow() {
               content = args.slice(2).join(" ");
             }
 
-            const filePath = path.join(currentWorkingDirectory, filename);
-            fs.writeFileSync(filePath, content + "\n", { flag: "w" });
-            sendOutput(`Created file: ${filename} with content`);
-            event.sender.send("command-complete", { code: 0 });
-            resolve({ output: "", errorOutput: "", code: 0 });
-            return;
+            const filePathCreate = path.join(currentWorkingDirectory, filename);
+            fs.writeFileSync(filePathCreate, content + "\n", { flag: "w" });
+            event.sender.send(
+              "command-output",
+              `Created file: ${filename} with content\n`
+            );
           } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
+            event.sender.send("command-output", `Error: ${err.message}\n`);
           }
+          break;
 
         case "grep":
           try {
@@ -276,21 +192,18 @@ function createWindow() {
               }
             }
 
-            const filePath = path.join(currentWorkingDirectory, targetFile);
+            const filePathGrep = path.join(currentWorkingDirectory, targetFile);
 
-            if (!fs.existsSync(filePath)) {
-              sendOutput(`File ${targetFile} does not exist`);
-              event.sender.send("command-complete", { code: 1 });
-              resolve({
-                output: "",
-                errorOutput: "File does not exist",
-                code: 1,
-              });
-              return;
+            if (!fs.existsSync(filePathGrep)) {
+              event.sender.send(
+                "command-output",
+                `File ${targetFile} does not exist\n`
+              );
+              break;
             }
 
-            const content = fs.readFileSync(filePath, "utf-8");
-            const lines = content.split("\n");
+            const contentGrep = fs.readFileSync(filePathGrep, "utf-8");
+            const lines = contentGrep.split("\n");
             let foundMatches = false;
 
             lines.forEach((line, index) => {
@@ -300,42 +213,34 @@ function createWindow() {
                 : pattern;
 
               if (testLine.includes(testPattern)) {
-                sendOutput(`${index + 1}: ${line}`);
+                event.sender.send("command-output", `${index + 1}: ${line}\n`);
                 foundMatches = true;
               }
             });
 
             if (!foundMatches) {
-              sendOutput(`No matches found in ${targetFile}`);
+              event.sender.send(
+                "command-output",
+                `No matches found in ${targetFile}\n`
+              );
             }
-
-            event.sender.send("command-complete", { code: 0 });
-            resolve({ output: "", errorOutput: "", code: 0 });
-            return;
           } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
+            event.sender.send("command-output", `Error: ${err.message}\n`);
           }
+          break;
 
         case "touch":
           try {
             if (!args[1]) {
               throw new Error("touch: missing operand");
             }
-            const filePath = path.join(currentWorkingDirectory, args[1]);
-            fs.writeFileSync(filePath, "", { flag: "w" });
-            sendOutput(`Created file: ${args[1]}`);
-            event.sender.send("command-complete", { code: 0 });
-            resolve({ output: "", errorOutput: "", code: 0 });
-            return;
+            const filePathTouch = path.join(currentWorkingDirectory, args[1]);
+            fs.writeFileSync(filePathTouch, "", { flag: "w" });
+            event.sender.send("command-output", `Created file: ${args[1]}\n`);
           } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
+            event.sender.send("command-output", `Error: ${err.message}\n`);
           }
+          break;
 
         case "rm":
           try {
@@ -343,8 +248,8 @@ function createWindow() {
               throw new Error("rm: missing operand");
             }
             const isRecursive = args.includes("-rf") || args.includes("-r");
-            const target = args[args.length - 1];
-            const targetPath = path.join(currentWorkingDirectory, target);
+            const targetRm = args[args.length - 1];
+            const targetPathRm = path.join(currentWorkingDirectory, targetRm);
 
             if (isRecursive) {
               const deleteRecursive = (itemPath) => {
@@ -361,97 +266,79 @@ function createWindow() {
                 }
               };
 
-              deleteRecursive(targetPath);
-              sendOutput(`Removed: ${target}`);
-              event.sender.send("command-complete", { code: 0 });
-              resolve({ output: "", errorOutput: "", code: 0 });
-              return;
+              deleteRecursive(targetPathRm);
+              event.sender.send("command-output", `Removed: ${targetRm}\n`);
             } else {
-              if (fs.existsSync(targetPath)) {
-                if (fs.statSync(targetPath).isDirectory()) {
-                  fs.rmdirSync(targetPath);
+              if (fs.existsSync(targetPathRm)) {
+                if (fs.statSync(targetPathRm).isDirectory()) {
+                  fs.rmdirSync(targetPathRm);
                 } else {
-                  fs.unlinkSync(targetPath);
+                  fs.unlinkSync(targetPathRm);
                 }
-                sendOutput(`Removed: ${target}`);
-                event.sender.send("command-complete", { code: 0 });
-                resolve({ output: "", errorOutput: "", code: 0 });
-                return;
+                event.sender.send("command-output", `Removed: ${targetRm}\n`);
               } else {
                 throw new Error(
-                  `rm: cannot remove '${target}': No such file or directory`
+                  `rm: cannot remove '${targetRm}': No such file or directory`
                 );
               }
             }
           } catch (err) {
-            sendOutput(`Error: ${err.message}`);
-            event.sender.send("command-complete", { code: 1 });
-            resolve({ output: "", errorOutput: err.message, code: 1 });
-            return;
+            event.sender.send("command-output", `Error: ${err.message}\n`);
           }
+          break;
 
         default:
-          // Special handling for git commands
-          if (command.startsWith("git ")) {
-            const gitPath = getGitExecutable();
-            const gitArgs = args.slice(1); // Remove 'git' from args
-
-            const cmdProcess = spawn(gitPath, gitArgs, {
-              cwd: currentWorkingDirectory,
-              env: { ...process.env, PATH: process.env.PATH },
-              shell: false,
-            });
-
-            cmdProcess.stdout.on("data", (data) => {
-              event.sender.send("command-output", data.toString());
-            });
-
-            cmdProcess.stderr.on("data", (data) => {
-              event.sender.send("command-output", data.toString());
-            });
-
-            cmdProcess.on("close", (code) => {
-              event.sender.send("command-complete", { code });
-              resolve({ code });
-            });
-
-            return;
-          }
-
-          // For other commands, use the shell
-          let shell;
-          let shellArgs;
-
+          // Execute via shell for non-built-in commands
           if (process.platform === "win32") {
-            shell = "cmd.exe";
-            // Replace newlines with ' & ' to chain commands
-            const formattedCommand = command.replace(/\r?\n/g, " & ");
-            shellArgs = ["/c", formattedCommand];
+            const shell = "cmd.exe";
+            const shellArgs = ["/c", cmd];
+            const shellProcess = spawn(shell, shellArgs, {
+              cwd: currentWorkingDirectory,
+              shell: true,
+            });
+
+            shellProcess.stdout.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
+            });
+            shellProcess.stderr.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
+            });
+
+            await new Promise((resolveCmd) => {
+              shellProcess.on("close", (code) => {
+                // Do not send 'command-complete' here to avoid multiple signals
+                resolveCmd();
+              });
+            });
           } else {
-            shell = "/bin/bash";
-            shellArgs = ["-c", command];
+            const shell = "/bin/bash";
+            const shellArgs = ["-c", cmd];
+            const shellProcess = spawn(shell, shellArgs, {
+              cwd: currentWorkingDirectory,
+              shell: true,
+            });
+
+            shellProcess.stdout.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
+            });
+            shellProcess.stderr.on("data", (data) => {
+              event.sender.send("command-output", data.toString());
+            });
+
+            await new Promise((resolveCmd) => {
+              shellProcess.on("close", (code) => {
+                // Do not send 'command-complete' here to avoid multiple signals
+                resolveCmd();
+              });
+            });
           }
-
-          const cmdProcess = spawn(shell, shellArgs, {
-            cwd: currentWorkingDirectory,
-            shell: true,
-          });
-
-          cmdProcess.stdout.on("data", (data) => {
-            event.sender.send("command-output", data.toString());
-          });
-
-          cmdProcess.stderr.on("data", (data) => {
-            event.sender.send("command-output", data.toString());
-          });
-
-          cmdProcess.on("close", (code) => {
-            event.sender.send("command-complete", { code });
-            resolve({ code });
-          });
           break;
       }
-    });
+    }
+
+    // After all commands are processed, send 'command-complete'
+    event.sender.send("command-complete", { code: 0 });
+    return { code: 0 };
   });
 
   // Handle 'get-cwd' IPC call
