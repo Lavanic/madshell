@@ -1,0 +1,13 @@
+{
+    "type": "service_account",
+    "project_id": "goodshell-voice-mode",
+    "private_key_id": "e8961cf5e2a152ca8749db964978715f54f10996",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC3C//t0z4LCije\niqFCrgk4kjpCqTtWD0J2JkDhzjBfxVxKli8EN9oJYbaMyX6SH/2uxTgBM5O846xI\nXDT95i+c4kAq6ZvrNUHdVYAA2uUERP3iLSBTuKuXXMwevo1LXZOK29RglAI9ZBLx\nA5Ihz+9F/TLtrivGxO3MmWkq3+NYIrnC+yYWtyD6q0blQJGEQvJXoJoPvhyaYSty\nUhASvbT/c2JscouUP9w9/KDtpaF07GPzTM9IQgja4T/H3tCNq9bH7Gtat9C+WzMs\n7YWRM7iQm9EhVr+sYWYwf26rGQ8IQMnivWFbwaKyqb0G6vPNPVc2MRPDyV08GG9G\ngjAa5JpdAgMBAAECggEAA170xdodI6wlITLkp11fgQ0mz4Pv8S6wL+2um1hsM+vg\nxGrekk/vGCLx6Pei4I3t+vR+Wd9QMPResGAqVOarNYPLzdz7YoVy/Lv2Ndb2tEC1\nxMm5Mlkf2JmCjraTixNunGP8qBG0wvLazLrh3dCu6l1Itz7GHf1nSHTFRV8xebXE\nrC4FrRoLI5udhLOX7FOsOty0brSEb3yr5k+ZodrED8Wqmi0vaVXEOQu9P0S8jHxw\n80nry1emaJqpw2JXuI9tW2/fz7ELIuRydPSFk2AcCheXw1TxGWiIz/d4glokgz6L\nyEsizKWEXWus0VAKxNHWVOqrQVZa5SturNbyht3bTQKBgQDp8IoEEVUa1HkKV0AS\nlKlBBlsUqNj9qa9c2e+U7FrZ6/qA6B7/WxUpYIEE/aHZu2n5eqncHQmRjdLU/Vvi\neJCZ8rJdYu68EFcNYQQwsXdylzxNrE4JQ00cVNRmUk3WMhZu82/8nqBvRBu7AXUA\n56Dr3QzHwAeI51nQ5imWx9ekQwKBgQDITuAg9uhXZEQePwq8ljcAr4tYQZLkapYU\nYlTRHu2iwIXm6eSHRlc0cgAL+2Q6sW5auy0jkMn6TXHzktg/buO9/3/OpfsqczfP\nFAjLH5kBQdzFh/mFTDf83a29WNPJJIs5eaXDpl3ShQUlAzAD3W6paHbaaWlb/f3f\nDbEqBlss3wKBgDgOg4PmA1aigz6PGbNaHBSQyVJyA00FVBgTwO0Wlc6SVTx+Yq8d\nzDxV+5SOkjHyTrqRQhKUgq52JYcUDuh9q2i4VzU5d6to3vM9xBtG6zByPOj/2NMv\nZVLcoOjD4BLrfaSogLUv7ZG76EkvWDIXTuA139IdmbCcf1EnVd/jkzCxAoGBAMOY\nWb12vJwRmX6beqV6XU07HWtZ5NFMzy4qcr4dYFjrfBVm0TPS2PaqVydcHJw/hA3u\n9n3jNYdINnxtKOKQKqzuH+QvKdpi1d1Mp+WI/kQ/BxCP3XRvX8B4yt25Ll0cZSMD\niX1KKBWYtNRWj31GrXeZPW27PxmIJG25lgT+XeurAoGAXIoW6eofyEVWyNuOCo6v\nJEg1BXphrFe7c8+w0FB55JziMFs8r8c2Wi1ulop4RPi9UgjR+ZLQFKXMgjIrhrYD\n9TWrw74UmC2mf2j1Xzdt88KezHAlCmhsAYYH7tC0k12HylB6Fot2QUPlEcbw661H\n25Y8yUCcfNJp36FsZlIV2i4=\n-----END PRIVATE KEY-----\n",
+    "client_email": "good-shell@goodshell-voice-mode.iam.gserviceaccount.com",
+    "client_id": "106679882029360188385",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/good-shell%40goodshell-voice-mode.iam.gserviceaccount.com",
+    "universe_domain": "googleapis.com"
+  }

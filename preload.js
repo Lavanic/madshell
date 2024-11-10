@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   windowControl: (action) => ipcRenderer.send("window-control", action),
+  startVoiceRecognition: () => ipcRenderer.invoke("start-voice-recognition"),
   executeCommand: (command) => ipcRenderer.invoke("execute-command", command),
   onCommandOutput: (callback) => {
     ipcRenderer.on("command-output", (event, data) => callback(data));

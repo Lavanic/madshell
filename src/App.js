@@ -25,6 +25,21 @@ const TerminalComponent = () => {
     window.electronAPI.windowControl(action);
   };
 
+  const activateVoiceMode = async (term) => {
+    term.write("\r\n\x1b[36mVoice mode activated. Please speak your command.\x1b[0m\r\n");
+  
+    try {
+      const speechResult = await window.electronAPI.startVoiceRecognition();
+      term.write(`\r\n\x1b[32mYou said: ${speechResult}\x1b[0m\r\n`);
+  
+      // Now handle the speechResult as a query
+      handleCommand("!" + speechResult, term);
+    } catch (error) {
+      term.write(`\r\n\x1b[31mError occurred in recognition: ${error.message}\x1b[0m\r\n`);
+      prompt(term);
+    }
+  };
+
   const formatDuration = (ms) => {
     if (ms < 1000) return `${ms}ms`;
     const seconds = Math.floor(ms / 1000);
@@ -154,35 +169,46 @@ IMPORTANT:
   };
 
   const renderInputLine = (term, suggestion) => {
+    let output = "";
+
+    // Hide cursor
+    output += "\x1b[?25l";
+
     // Clear the current line
-    term.write("\x1b[2K\r"); // Clear line
+    output += "\x1b[2K\r"; // Clear line and return carriage
 
     // Write prompt
-    term.write(promptRef.current);
+    output += promptRef.current;
 
     // Write user input up to the cursor position
     const inputBeforeCursor = commandBufferRef.current.slice(
       0,
       cursorPositionRef.current
     );
-    term.write(inputBeforeCursor);
+    output += inputBeforeCursor;
 
-    // Set the cursor
-    term.write("\x1b[s"); // Save cursor position
+    // Save cursor position
+    output += "\x1b[s";
 
     // Write the rest of the input
     const inputAfterCursor = commandBufferRef.current.slice(
       cursorPositionRef.current
     );
-    term.write(inputAfterCursor);
+    output += inputAfterCursor;
 
     // Write suggestion in gray
     if (suggestion) {
-      term.write("\x1b[90m" + suggestion + "\x1b[0m");
+      output += "\x1b[90m" + suggestion + "\x1b[0m";
     }
 
     // Restore cursor position
-    term.write("\x1b[u"); // Restore cursor position
+    output += "\x1b[u";
+
+    // Show cursor
+    output += "\x1b[?25h";
+
+    // Write everything to the terminal at once
+    term.write(output);
   };
 
   const updateSuggestion = async (term) => {
@@ -416,6 +442,12 @@ IMPORTANT:
   const handleCommand = async (command, term) => {
     if (command === "") {
       prompt(term);
+      return;
+    }
+
+    if (command.startsWith("!v")) {
+      // Activate voice mode
+      await activateVoiceMode(term);
       return;
     }
 
