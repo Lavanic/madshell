@@ -73,6 +73,7 @@ echo "Hello, World!" > hello.txt
 Current directory: ${currentCwd}
 
 IMPORTANT:
+1. Whenever you are tasked with building an application such as a React application, ALWAYS install dependencies first
 1. Use echo commands with > for first line and >> for subsequent lines
 2. Preserve proper indentation in the echo strings
 3. Return only the commands, no explanations or formatting
