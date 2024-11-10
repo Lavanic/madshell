@@ -25,6 +25,21 @@ const TerminalComponent = () => {
     window.electronAPI.windowControl(action);
   };
 
+  const activateVoiceMode = async (term) => {
+    term.write("\r\n\x1b[36mVoice mode activated. Please speak your command.\x1b[0m\r\n");
+  
+    try {
+      const speechResult = await window.electronAPI.startVoiceRecognition();
+      term.write(`\r\n\x1b[32mYou said: ${speechResult}\x1b[0m\r\n`);
+  
+      // Now handle the speechResult as a query
+      handleCommand("!" + speechResult, term);
+    } catch (error) {
+      term.write(`\r\n\x1b[31mError occurred in recognition: ${error.message}\x1b[0m\r\n`);
+      prompt(term);
+    }
+  };
+
   const formatDuration = (ms) => {
     if (ms < 1000) return `${ms}ms`;
     const seconds = Math.floor(ms / 1000);
@@ -44,7 +59,7 @@ const TerminalComponent = () => {
   const convertNLQToCommand = async (query) => {
     try {
       const response = await fetch(
-        "https://adb-2339467812627777.17.azuredatabricks.net/serving-endpoints/databricks-meta-llama-3-1-70b-instruct/invocations",
+        "https://adb-2339467812627777.17.azuredatabricks.net/serving-endpoints/mini/invocations",
         {
           method: "POST",
           headers: {
@@ -427,6 +442,12 @@ IMPORTANT:
   const handleCommand = async (command, term) => {
     if (command === "") {
       prompt(term);
+      return;
+    }
+
+    if (command.startsWith("!v")) {
+      // Activate voice mode
+      await activateVoiceMode(term);
       return;
     }
 

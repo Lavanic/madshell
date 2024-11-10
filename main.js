@@ -1,11 +1,15 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
-const { spawn, exec } = require("child_process"); // Add exec here
+const { spawn, exec } = require("child_process");
 const fs = require("fs");
+const record = require("node-record-lpcm16");
+const speech = require("@google-cloud/speech");
 
 // Store the current working directory and venv path
 let currentWorkingDirectory = process.cwd();
 let currentVenvPath = null;
+
+const client = new speech.SpeechClient();
 
 function getGitExecutable() {
   return process.platform === 'win32' ? 'git' : '/usr/bin/git';
@@ -41,7 +45,7 @@ function createWindow() {
       case "close":
         win.close();
         break;
-      case "minimize":  
+      case "minimize":
         win.minimize();
         break;
       case "maximize":
@@ -49,6 +53,7 @@ function createWindow() {
         break;
     }
   });
+
   ipcMain.handle("execute-command", async (event, command) => {
     return new Promise((resolve) => {
       // Function to send output without extra spacing
@@ -57,50 +62,50 @@ function createWindow() {
         const cleanOutput = text.replace(/\r?\n$/, "") + "\n";
         event.sender.send("command-output", cleanOutput);
       };
-  
+
       // Check if command is multi-line or contains shell operators
       const isMultiCommand = command.includes('\n');
       const containsShellOperators = ['&&', '||', ';', '|', '>', '<'].some(op => command.includes(op));
-  
+
       // Special handling for Python venv creation and activation
       if (command.includes('python') && command.includes('venv')) {
         const commands = command.split('\n');
         let venvName = 'myenv';
-        
+
         // Extract venv name if specified
         const venvCommand = commands.find(cmd => cmd.includes('-m venv'));
         if (venvCommand) {
           const parts = venvCommand.split(' ');
           venvName = parts[parts.length - 1];
         }
-  
+
         // Create venv
         const createVenvProcess = spawn('python3', ['-m', 'venv', venvName], {
           cwd: currentWorkingDirectory
         });
-  
+
         createVenvProcess.on('close', (code) => {
           if (code === 0) {
             // Store the venv path for future use
             currentVenvPath = path.join(currentWorkingDirectory, venvName);
             sendOutput(`Created virtual environment: ${venvName}\n`);
             sendOutput(`Virtual environment activated: ${venvName}\n`);
-            
+
             // Execute any additional commands in the venv context
             const remainingCommands = commands.slice(2); // Skip venv creation and activation
             if (remainingCommands.length > 0) {
               const binPath = process.platform === 'win32' ? 'Scripts' : 'bin';
               const pipPath = path.join(currentVenvPath, binPath, 'pip');
-              
+
               remainingCommands.forEach(cmd => {
                 if (cmd.startsWith('pip')) {
                   const pipProcess = spawn(pipPath, cmd.split(' ').slice(1), {
                     cwd: currentWorkingDirectory
                   });
-                  
+
                   pipProcess.stdout.on('data', (data) => sendOutput(data.toString()));
                   pipProcess.stderr.on('data', (data) => sendOutput(data.toString()));
-                  
+
                   pipProcess.on('close', (code) => {
                     event.sender.send('command-complete', { code });
                     resolve({ code });
@@ -117,10 +122,10 @@ function createWindow() {
             resolve({ code: 1 });
           }
         });
-        
+
         return;
       }
-  
+
       // If it's a multi-line command or contains shell operators, execute directly
       if (isMultiCommand || containsShellOperators) {
         // Handle multi-line commands
@@ -128,7 +133,7 @@ function createWindow() {
           const commands = command.split('\n').filter(cmd => cmd.trim());
           command = commands.join(' && ');
         }
-  
+
         // Use exec to execute the command
         exec(command, { cwd: currentWorkingDirectory }, (error, stdout, stderr) => {
           if (stdout) {
@@ -148,35 +153,35 @@ function createWindow() {
         });
         return;
       }
-  
+
       // For regular commands that should use venv
       if (currentVenvPath && shouldUseVenv(command)) {
         const args = command.trim().split(/\s+/);
         const cmd = args[0];
         const binPath = process.platform === 'win32' ? 'Scripts' : 'bin';
         const commandPath = path.join(currentVenvPath, binPath, cmd);
-        
+
         if (fs.existsSync(commandPath)) {
           const venvProcess = spawn(commandPath, args.slice(1), {
             cwd: currentWorkingDirectory
           });
-          
+
           venvProcess.stdout.on('data', (data) => sendOutput(data.toString()));
           venvProcess.stderr.on('data', (data) => sendOutput(data.toString()));
-          
+
           venvProcess.on('close', (code) => {
             event.sender.send('command-complete', { code });
             resolve({ code });
           });
-          
+
           return;
         }
       }
-  
+
       // Handle built-in commands
       const args = command.trim().split(/\s+/);
       const cmd = args[0];
-  
+
       switch (cmd) {
         case "clear":
           // Send special clear command to terminal
@@ -184,7 +189,7 @@ function createWindow() {
           event.sender.send("command-complete", { code: 0 });
           resolve({ output: "", errorOutput: "", code: 0 });
           return;
-  
+
         case "ls":
           try {
             const files = fs.readdirSync(currentWorkingDirectory);
@@ -199,10 +204,10 @@ function createWindow() {
                 return `${colorCode}${file}${suffix}\x1b[0m`;
               })
               .join("\n");
-  
+
             sendOutput(output);
             event.sender.send("command-complete", { code: 0 });
-            resolve({ output, errorOutput: "", code: 0 });
+            resolve({ output: "", errorOutput: "", code: 0 });
             return;
           } catch (err) {
             sendOutput(`Error: ${err.message}`);
@@ -210,7 +215,7 @@ function createWindow() {
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
-  
+
         case "mkdir":
           try {
             if (!args[1]) {
@@ -228,34 +233,34 @@ function createWindow() {
             resolve({ output: "", errorOutput: err.message, code: 1 });
             return;
           }
-  
+
         // ... Include other built-in commands like 'pwd', 'touch', 'rm', etc.
-  
+
         default:
           // Special handling for git commands
           if (command.startsWith('git ')) {
             const gitPath = getGitExecutable();
             const gitArgs = args.slice(1);  // Remove 'git' from args
-            
+
             const cmdProcess = spawn(gitPath, gitArgs, {
               cwd: currentWorkingDirectory,
               env: { ...process.env, PATH: process.env.PATH },
               shell: false
             });
-        
+
             cmdProcess.stdout.on('data', (data) => {
               event.sender.send('command-output', data.toString());
             });
-        
+
             cmdProcess.stderr.on('data', (data) => {
               event.sender.send('command-output', data.toString());
             });
-        
+
             cmdProcess.on('close', (code) => {
               event.sender.send('command-complete', { code });
               resolve({ code });
             });
-            
+
             return;
           } else {
             // For other commands, use exec
@@ -279,7 +284,56 @@ function createWindow() {
       }
     });
   });
-  
+
+  // Add the start-voice-recognition handler
+  ipcMain.handle("start-voice-recognition", async () => {
+    return new Promise((resolve, reject) => {
+      const request = {
+        config: {
+          encoding: "LINEAR16",
+          sampleRateHertz: 16000,
+          languageCode: "en-US",
+        },
+        interimResults: false,
+      };
+
+      const recognizeStream = client
+        .streamingRecognize(request)
+        .on("error", (error) => {
+          console.error("Error during speech recognition:", error);
+          reject(error);
+        })
+        .on("data", (data) => {
+          if (data.results[0] && data.results[0].alternatives[0]) {
+            const transcript = data.results[0].alternatives[0].transcript;
+            resolve(transcript);
+          }
+        });
+
+      const recording = record.record({
+        sampleRateHertz: 16000,
+        threshold: 0,
+        verbose: false,
+        recordProgram: "rec", // Use 'sox' or 'rec' for macOS, 'arecord' for Linux
+        silence: "1.0",
+      });
+
+      const recordingStream = recording.stream();
+
+      recordingStream
+        .on("error", (error) => {
+          console.error("Error during recording:", error);
+          reject(error);
+        })
+        .pipe(recognizeStream);
+
+      // Stop recording after silence is detected
+      // The 'end' event is emitted when recording stops
+      recordingStream.on('end', () => {
+        console.log('Recording ended');
+      });
+    });
+  });
 
   // Handle 'get-cwd' IPC call
   ipcMain.handle("get-cwd", () => {
@@ -313,7 +367,19 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  app.on("web-contents-created", (event, contents) => {
+    contents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+      if (permission === "media") {
+        callback(true); // Approve microphone access
+      } else {
+        callback(false);
+      }
+    });
+  });
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
