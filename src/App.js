@@ -639,12 +639,12 @@ IMPORTANT:
       const directory = command.slice(3).trim();
       const result = await window.electronAPI.changeDirectory(directory);
       if (!result.success) {
-        term.writeln(`cd: ${result.message}`);
+        enqueueOutput(`cd: ${result.message}\r\n`);
       }
       const duration = Date.now() - commandStartTimeRef.current;
-      writeCommandResult(term, duration);
-      prompt(term);
-      return; // Add this return
+      writeCommandResult(duration);
+      prompt();
+      return;
     } else {
       commandStartTimeRef.current = Date.now();
       window.electronAPI.executeCommand(command);

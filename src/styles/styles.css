@@ -94,6 +94,7 @@ body,
   background-color: rgba(19, 40, 83, 0.95); /* Match terminal background */
   color: rgba(255, 255, 255, 0.512);
   padding-left: 10px; /* Add left padding for wiggle room */
+  padding-bottom: 4px;
   flex: 0 0 auto;
 }
 .ascii-art {
