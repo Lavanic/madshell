@@ -12,9 +12,13 @@ const TerminalComponent = () => {
   const [commandHistory, setCommandHistory] = useState([]);
   const [currentCwd, setCurrentCwd] = useState("");
   const [isProcessingNLQ, setIsProcessingNLQ] = useState(false);
+  // Define both state and ref for command history
+  const commandHistoryRef = useRef([]);
+  // Updated: Command buffer and cursor position
   const commandBufferRef = useRef("");
+  const cursorPositionRef = useRef(0); // Track cursor position within the command buffer
   const historyPositionRef = useRef(-1);
-  const currentSuggestionRef = useRef(""); // Store the current suggestion
+  const currentSuggestionRef = useRef("");
   const promptRef = useRef("");
 
   const handleWindowControls = (action) => {
@@ -156,19 +160,29 @@ IMPORTANT:
     // Write prompt
     term.write(promptRef.current);
 
-    // Write user input
-    term.write(commandBufferRef.current);
+    // Write user input up to the cursor position
+    const inputBeforeCursor = commandBufferRef.current.slice(
+      0,
+      cursorPositionRef.current
+    );
+    term.write(inputBeforeCursor);
+
+    // Set the cursor
+    term.write("\x1b[s"); // Save cursor position
+
+    // Write the rest of the input
+    const inputAfterCursor = commandBufferRef.current.slice(
+      cursorPositionRef.current
+    );
+    term.write(inputAfterCursor);
 
     // Write suggestion in gray
     if (suggestion) {
       term.write("\x1b[90m" + suggestion + "\x1b[0m");
     }
 
-    // Move cursor back to after user input
-    const backLength = suggestion ? suggestion.length : 0;
-    if (backLength > 0) {
-      term.write("\x1b[" + backLength + "D");
-    }
+    // Restore cursor position
+    term.write("\x1b[u"); // Restore cursor position
   };
 
   const updateSuggestion = async (term) => {
@@ -220,13 +234,15 @@ IMPORTANT:
     }
   };
 
+  // Update navigateHistory to use commandHistoryRef.current
   const navigateHistory = async (term, direction) => {
-    if (commandHistory.length === 0) return;
+    const history = commandHistoryRef.current;
+    if (history.length === 0) return;
 
     if (direction === "up") {
       historyPositionRef.current = Math.min(
         historyPositionRef.current + 1,
-        commandHistory.length - 1
+        history.length - 1
       );
     } else {
       historyPositionRef.current = Math.max(historyPositionRef.current - 1, -1);
@@ -234,14 +250,17 @@ IMPORTANT:
 
     if (historyPositionRef.current >= 0) {
       const historicalCommand =
-        commandHistory[commandHistory.length - 1 - historyPositionRef.current]
-          .command;
+        history[history.length - 1 - historyPositionRef.current].command;
       commandBufferRef.current = historicalCommand;
     } else {
       commandBufferRef.current = "";
     }
 
-    await updateSuggestion(term);
+    // Update the cursor position to the end of the new command
+    cursorPositionRef.current = commandBufferRef.current.length;
+
+    // Render the input line with the updated command and cursor position
+    renderInputLine(term, currentSuggestionRef.current);
   };
 
   useEffect(() => {
@@ -273,40 +292,71 @@ IMPORTANT:
     term.write("Use Tab for auto-completion and ↑↓ for command history\r\n");
     prompt(term);
 
-    term.onData(async (data) => {
-      const code = data.charCodeAt(0);
+    term.onKey(async (e) => {
+      const { key, domEvent } = e;
+      console.log("Key pressed:", domEvent.key);
+      const keyName = domEvent.key;
+      const printable =
+        !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
 
-      if (code === 13) {
+      if (keyName === "Enter") {
         // Enter
         term.write("\r\n");
         const command = commandBufferRef.current.trim();
         handleCommand(command, term);
         commandBufferRef.current = "";
+        cursorPositionRef.current = 0;
         historyPositionRef.current = -1;
         currentSuggestionRef.current = "";
-      } else if (code === 9) {
+      } else if (keyName === "Tab") {
         // Tab
         if (currentSuggestionRef.current) {
           commandBufferRef.current += currentSuggestionRef.current;
+          cursorPositionRef.current = commandBufferRef.current.length;
           await updateSuggestion(term);
         }
-      } else if (code === 127 || code === 8) {
+      } else if (keyName === "Backspace") {
         // Backspace
-        if (commandBufferRef.current.length > 0) {
-          commandBufferRef.current = commandBufferRef.current.slice(0, -1);
+        if (cursorPositionRef.current > 0) {
+          commandBufferRef.current =
+            commandBufferRef.current.slice(0, cursorPositionRef.current - 1) +
+            commandBufferRef.current.slice(cursorPositionRef.current);
+          cursorPositionRef.current--;
           await updateSuggestion(term);
         }
-      } else if (code === 27) {
-        // ESC sequence
-        if (data === "\x1b[A") {
-          // Up arrow
-          await navigateHistory(term, "up");
-        } else if (data === "\x1b[B") {
-          // Down arrow
-          await navigateHistory(term, "down");
+      } else if (keyName === "Delete") {
+        // Delete
+        if (cursorPositionRef.current < commandBufferRef.current.length) {
+          commandBufferRef.current =
+            commandBufferRef.current.slice(0, cursorPositionRef.current) +
+            commandBufferRef.current.slice(cursorPositionRef.current + 1);
+          await updateSuggestion(term);
         }
-      } else if (code >= 32) {
-        commandBufferRef.current += data;
+      } else if (keyName === "ArrowLeft") {
+        // Left arrow
+        if (cursorPositionRef.current > 0) {
+          cursorPositionRef.current--;
+          renderInputLine(term, currentSuggestionRef.current);
+        }
+      } else if (keyName === "ArrowRight") {
+        // Right arrow
+        if (cursorPositionRef.current < commandBufferRef.current.length) {
+          cursorPositionRef.current++;
+          renderInputLine(term, currentSuggestionRef.current);
+        }
+      } else if (keyName === "ArrowUp") {
+        // Up arrow
+        await navigateHistory(term, "up");
+      } else if (keyName === "ArrowDown") {
+        // Down arrow
+        await navigateHistory(term, "down");
+      } else if (printable && key.length === 1) {
+        // Regular character input
+        commandBufferRef.current =
+          commandBufferRef.current.slice(0, cursorPositionRef.current) +
+          key +
+          commandBufferRef.current.slice(cursorPositionRef.current);
+        cursorPositionRef.current++;
         await updateSuggestion(term);
       }
     });
@@ -369,8 +419,34 @@ IMPORTANT:
       return;
     }
 
+    const newEntry = {
+      command,
+      timestamp: new Date(),
+      cwd: currentCwd,
+    };
+
+    setCommandHistory((prev) => {
+      const newHistory = [...prev, newEntry];
+      commandHistoryRef.current = newHistory;
+      return newHistory;
+    });
+
     if (command.startsWith("!")) {
       const query = command.slice(1).trim();
+
+      const newEntry = {
+        command: `!${query}`,
+        convertedCommand: shellCommand,
+        timestamp: new Date(),
+        cwd: currentCwd,
+      };
+
+      setCommandHistory((prev) => {
+        const newHistory = [...prev, newEntry];
+        commandHistoryRef.current = newHistory;
+        return newHistory;
+      });
+
       setIsProcessingNLQ(true);
       term.write("\r\n\x1b[36mConverting natural language query...\x1b[0m");
 
